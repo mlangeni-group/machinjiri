@@ -71,8 +71,13 @@ class AppServiceProvider extends ServiceProvider
 
         // -------------------- Authentication Services --------------------
         // Session and Cookie handlers are singletons for state management.
-        $this->singleton(Session::class);
-        $this->singleton(Cookie::class);
+        $this->singleton(Session::class, function ($app) {
+            return new Session($app);
+        });
+        
+        $this->singleton(Cookie::class, function ($app) {
+            return new Cookie($app);
+        });
 
         // AuthManager handles authentication logic; requires configuration.
         $this->singleton(AuthManager::class, function ($app) {

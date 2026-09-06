@@ -4,6 +4,7 @@ namespace Mlangeni\Machinjiri\Core\Authentication;
 
 use Mlangeni\Machinjiri\Core\Container;
 use Mlangeni\Machinjiri\Core\Exceptions\MachinjiriException;
+use Mlangeni\Machinjiri\Core\Http\HttpRequest;
 
 class Session {
     private int $timeout;
@@ -11,8 +12,14 @@ class Session {
     private ?string $domain;
     private bool $secure;
 
-    public function __construct() {
-        // Load environment-based configurations
+    private Container $app;
+    public HttpRequest $request;
+    public array $config;
+
+    public function __construct(Container $app) {
+        $this->request = $app->resolve(HttpRequest::class);
+        $this->config = array_merge(self::defaultConfig(), $this->getAppConfigurations());
+        
         $this->loadSessionConfig();
         
         if (session_status() == PHP_SESSION_NONE) {
@@ -24,18 +31,44 @@ class Session {
 
     private function loadSessionConfig(): void {
         // Convert minutes to seconds for timeout
-        $lifetimeMinutes = (int)($_ENV['SESSION_LIFETIME'] ?? 120);
+        $lifetimeMinutes = (int) $this->config['lifetime'];
         $this->timeout = $lifetimeMinutes * 60;
         
-        $this->cookieName = $_ENV['SESSION_COOKIE'] ?? 'machinjiri_session';
-        $this->domain = $_ENV['SESSION_DOMAIN'] ?? null;
-        $this->secure = filter_var($_ENV['SESSION_SECURE_COOKIE'] ?? false, FILTER_VALIDATE_BOOLEAN);
+        $this->cookieName = $this->config['cookie'];
+        $this->domain = $this->config['domain'];
+        $this->secure = $this->config['secure'];
+    }
+
+    private static function defaultConfig(): array 
+    {
+        return [
+            'driver' => 'file',
+            'lifetime' => 120,
+            'expire_on_close' => false,
+            'encrypt' => false,
+            'files' => storage_path('session'),
+            'connection' => null,
+            'table' => 'sessions',
+            'store' => null,
+            'lottery' => [2, 100],
+            'cookie' => 'machinjiri_session',
+            'path' => '/',
+            'domain' => '',
+            'secure' => false,
+            'http_only' => true,
+            'same_site' => 'lax',
+        ];
+    }
+
+    public function getAppConfigurations(): array
+    {
+        return $this->app->configurations['app'] ?? [];
     }
 
     private function configureSession(): void {
         // Determine session save path based on driver
-        $sessionPath = env('SESSION_DRIVER') === 'file' 
-            ? Container::$appBasePath . "/../storage/session/"
+        $sessionPath = ($this->config['driver'] === 'file') 
+            ? $this->config['files']
             : '';
 
         if ($sessionPath && !is_dir($sessionPath)) {
@@ -47,10 +80,10 @@ class Session {
         session_set_cookie_params([
             'lifetime' => $this->timeout,
             'path' => '/',
-            'domain' => $this->domain ?? ($_SERVER['HTTP_HOST'] ?? 'localhost'),
+            'domain' => $this->domain ?? ($this->request->getServerParam()['HTTP_HOST'] ?? 'locahost'),
             'secure' => $this->secure,
-            'httponly' => true,
-            'samesite' => 'Strict'
+            'httponly' => $this->config['http_only'],
+            'samesite' => $this->config['same_site'],
         ]);
         
         if ($sessionPath) {
@@ -92,8 +125,8 @@ class Session {
     }
 
     private function generateFingerprint(): string {
-        $ip = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
-        $agent = $_SERVER['HTTP_USER_AGENT'] ?? '';
+        $ip = $this->request->getServerParam()['REMOTE_ADDR'] ?? '127.0.0.1';
+        $agent = $this->request->getServerParam()['HTTP_USER_AGENT'] ?? 'artisan cli';
         return hash('sha256', $agent . $ip);
     }
     
@@ -128,4 +161,5 @@ class Session {
           $this->initializeSession();
       }
     }
+    
 }

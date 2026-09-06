@@ -2,24 +2,24 @@
 namespace Mlangeni\Machinjiri\Core\Authentication;
 
 use Mlangeni\Machinjiri\Core\Container;
+use Mlangeni\Machinjiri\Core\Authentication\Session;
 
 class Cookie {
-  
-  private static $defaultPath;
-  
-  public function __construct () {
-    self::$defaultPath = Container::$appBasePath . "/../storage/cookies/";
-    if (!is_dir(self::$defaultPath)) mkdir(self::$defaultPath, 0755);
+
+  private Session $session;
+
+  public function __construct(private Container $app) {
+      $this->session = new Session($app);
   }
 
-  public function set(string $name, mixed $value, int $expire = 0, string $path = '', string $domain = '', bool $secure = false, bool $httponly = true): void {
-    setcookie($name, (string)$value, [
+  public function set(string $name, mixed $value, int $expire = 0, string $path = '', string $domain = '', bool $secure = false, bool $httponly = true): bool {
+    return setcookie($name, (string) $value, [
       'expires' => $expire === 0 ? 0 : time() + $expire,
-      'path' => self::$defaultPath,
-      'domain' => $domain,
+      'path' => $this->session->config['path'] ?? '/',
+      'domain' => (!empty($domain)) ? $domain : $this->session->config['domain'] ?? $this->session->request->getServerParam()['HTTP_HOST'] ?? 'localhost',
       'secure' => $secure,
       'httponly' => $httponly,
-      'samesite' => 'Lax'
+      'samesite' => $this->session->config['same_site'] ?? 'Lax'
     ]);
   }
 

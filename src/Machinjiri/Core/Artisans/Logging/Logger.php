@@ -135,10 +135,9 @@ class Logger
     
     protected static function getLogsRoot(): string
     {
-        $appBase = Container::$appBasePath . '/../storage/logs/';
-        $artisanTerminal = Container::$terminalBase . 'storage/logs/';
-        $path = is_dir($appBase) ? $appBase : $artisanTerminal;
-        return is_dir($path) ? $path : Container::getSystemTempDir();
+        return (Container::instancePresent())
+            ? Container::getInstance()->storage . 'logs/'
+            : Container::getSystemTempDir() . '/logs/';
     }
 
     protected function shouldLog(string $level): bool

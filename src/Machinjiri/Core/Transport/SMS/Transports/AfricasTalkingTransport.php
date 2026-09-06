@@ -45,13 +45,11 @@ class AfricasTalkingTransport extends AbstractTransport implements TransportInte
     public function doSend(Message $message): Response
     {
         $sms = $this->at->sms();
-        $result = $sms->send([
+        $data = $sms->send([
             'to'      => $message->getTo(),
             'message' => $message->getText(),
             'from'    => $message->getFrom(),
         ]);
-
-        $data = $result->getData();
 
         if ($data['status'] === 'success') {
             $messageId = $data['SMSMessageData']['Recipients'][0]['messageId'] ?? null;
@@ -69,12 +67,11 @@ class AfricasTalkingTransport extends AbstractTransport implements TransportInte
 
     protected function isRetryableFailure(Response $response): bool
     {
-        // implement logic
         return false;
     }
+    
     protected function isRetryableException(\Throwable $e): bool
     {
-        // implement logic
         return false;
     }
     

@@ -7,6 +7,7 @@ use Mlangeni\Machinjiri\Core\Artisans\Helpers\DotEnv;
 use Mlangeni\Machinjiri\Core\Database\DatabaseConnection;
 use Mlangeni\Machinjiri\Core\Artisans\Logging\{Logger, LoggerFactory};
 use Mlangeni\Machinjiri\Core\Artisans\Events\EventListener;
+use Mlangeni\Machinjiri\Core\ProviderLoader;
 
 /**
  * Container
@@ -76,12 +77,6 @@ class Container
     protected array $paths = [];
     
     /**
-     * Base used for terminal operations; default is current directory.
-     * @var string
-     */
-    public static $terminalBase = "./";
-    
-    /**
      * Application environment
      */
     protected $appEnvironment;
@@ -93,7 +88,7 @@ class Container
     /**
      * Provider loader instance
      */
-    public ?ProviderLoader $providerLoader = null;
+    protected ?ProviderLoader $providerLoader = null;
 
     /**
      * Logger instance used by the application (general purpose).
@@ -112,7 +107,7 @@ class Container
     /**
      * Log filename for framework
      */
-    public const LOG_FILENAME = "machinjiri";
+    public const LOG_FILENAME = "machinjiri-framework";
     
     /**
      * Container constructor.
@@ -120,20 +115,15 @@ class Container
      * @param string $appBasePath Application base path — trimmed of trailing directory separator.
      * @param bool $appEnvironment Application environment (true = development, false = production)
      */
-    public function __construct(string $appBasePath, bool $appEnvironment = true, ?bool $isArtisan = null)
+    public function __construct(string $appBasePath, ?bool $appEnvironment = null)
     {
         // Normalize and store the base path for later use.
         self::$appBasePath = rtrim($appBasePath, DIRECTORY_SEPARATOR);
-
-        $this->appEnvironment = $appEnvironment;
-
+        $this->appEnvironment = $appEnvironment ?? self::resolveDebugMode($appBasePath);
         // Prepare an event listener with a dedicated logger for event-related messages
         $this->listener = new EventListener(self::systemLogger(self::LOG_FILENAME, true));
-
         // Create logger instance
         $this->logger = self::systemLogger(self::LOG_FILENAME);
-
-        
         // Initialize all array properties to empty arrays
         $this->bindings = [];
         $this->aliases = [];
@@ -148,15 +138,14 @@ class Container
         $this->routeBindings = [];
         $this->routeModelBindings = [];
         $this->paths = [];
-        
         // Set the global instance if not already set
         if (self::$instance === null) {
             self::$instance = $this;
         }
-        
-        $this->isArtisan = $isArtisan ?? false;
-
+        $this->isArtisan = false;
         $this->initialize();
+
+        $this->loadServiceContainer();
     }
     
     /**
@@ -184,8 +173,7 @@ class Container
      */
     public static function setInstance(Container $container): void
     {
-        self::$instance = $container;
-        
+        self::$instance = $container;    
         // Also set in global scope for helper functions
         $GLOBALS['__machinjiri_container'] = $container;
     }
@@ -989,7 +977,7 @@ class Container
 
     protected static function systemLogger(string $logFile, bool $event = false): Logger 
     {
-        return LoggerFactory::system($logFile, "system", $event);
+        return LoggerFactory::system($logFile, "framework", $event);
     }
 
     public function isDownForMaintenance(): bool 
@@ -997,6 +985,20 @@ class Container
         $configuration = $this->getConfigurations()['app'];
         $maintenanceMode = $configuration['app_maintenance'] ?? $configuration['maintenance'] ?? getenv('APP_MAINTENANCE') ?? false;
         return filter_var($maintenanceMode, FILTER_VALIDATE_BOOLEAN);
+    }
+
+    private function loadServiceContainer(): void 
+    {
+        $providerLoader = new ProviderLoader($this);
+        $providerLoader->register();
+        $providerLoader->boot();
+    }
+
+    public static function resolveDebugMode(string $path): bool
+    {
+        $dotEnv = new DotEnv(null, true, $path)->load()->getVariables();
+        $envDebug = $dotEnv['APP_DEBUG'] ?? true;
+        return filter_var($envDebug, FILTER_VALIDATE_BOOLEAN);
     }
     
 }

@@ -3,7 +3,7 @@
   "description": "Machinjiri is a lightweight, flexible PHP framework for rapid web development.",
   "type": "library",
   "license": "proprietary",
-  "version": "2.2.2",
+  "version": "2.2.3",
   "authors": [
     {
       "name": "Precious Lyson",

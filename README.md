@@ -2,9 +2,9 @@
 
 Machinjiri is a **flexible, powerful PHP framework** designed for rapid web development. Built for PHP 8.3+, it provides a modular architecture, elegant routing system, comprehensive database abstraction, authentication and authorization, and robust security features. Designed for speed, scalability, and developer experience, Machinjiri empowers developers to build secure, maintainable applications efficiently.
 
-Current stable version: `2.2.2`
+Current stable version: `2.2.3`
 
-## What’s New in 2.2.2
+## What’s New in 2.2.3
 
 - Added a persistent task scheduler with cron expressions, queued execution, overlap locks, task groups, priorities, retries, caching, and health checks
 - Added scheduler Artisan commands for creating, listing, running, enabling, disabling, and inspecting scheduled tasks
@@ -306,22 +306,24 @@ your-project/
 │   ├── Queue/                # Queue Drivers
 │   │     └── Drivers/        # Driver Files (Custom Queue Drivers)
 │   ├── Models/               # Data models
+│   ├── Tasks/                # Scheduled Tasks
+│   ├── Webhooks/             # Webhooks
 │   ├── Providers/            # Service providers
 │   └── Exceptions/           # Custom exceptions
 ├── bootstrap/
-│   ├── app.php/              # Application bootstrap file
-│   ├── artisan.php/              # Application bootstrap file
-│   └── helpers.php           # Helper functions (API)
+│   └── app.php               # App Bootstrap
 ├── config/
-│   ├── app.php               # Application configuration
-│   ├── database.php          # Database configuration
-│   ├── mail.php              # Mail service configuration
-│   ├── auth.php              # Authentication configuration
-│   └── providers.php         # Service providers list
+│   ├── core/                 # Application configuration
+│   │   ├── app.php        
+│   │   ├── cache.php 
+│   │   └── auth.php
+│   └── services
+│       └── providers.php     # Service providers list
 ├── database/
 │   ├── migrations/           # Database migration files
 │   ├── seeders/              # Database seeder classes
-│   └── factories/            # Model factory classes
+│   ├── factories/            # Database factory classes
+│   └── cache-prefetch-db.php # Prefetch Database Cache file 
 ├── resources/
 │   └── views/                # View templates
 │       ├── layouts/          # Layout templates

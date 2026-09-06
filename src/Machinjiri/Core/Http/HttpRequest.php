@@ -2,6 +2,7 @@
 
 namespace Mlangeni\Machinjiri\Core\Http;
 
+use Mlangeni\Machinjiri\Core\Container;
 use Mlangeni\Machinjiri\Core\Http\HttpClient;
 use Mlangeni\Machinjiri\Core\Authentication\Session;
 use Mlangeni\Machinjiri\Core\Authentication\Cookie;
@@ -63,10 +64,8 @@ class HttpRequest {
         $body = file_get_contents('php://input');
 
         // Initialize Session and Cookie if needed
-        $session = class_exists('\Mlangeni\Machinjiri\Core\Authentication\Session') ? 
-                   new Session() : null;
-        $cookie = class_exists('\Mlangeni\Machinjiri\Core\Authentication\Cookie') ? 
-                  new Cookie() : null;
+        $session = null;
+        $cookie = null;
         
         // Initialize OAuth if needed (optional)
         $oauth = null;

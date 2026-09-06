@@ -46,7 +46,7 @@ trait CommandHelper
     protected function resolveArtisanBootstrapFile(): ?string
     {
         $cwd = getcwd();
-        $candidate = $cwd . '/bootstrap/artisan.php';
+        $candidate = $cwd . '/bootstrap/app.php';
         if (file_exists($candidate)) {
             return $candidate;
         }
@@ -54,7 +54,7 @@ trait CommandHelper
         // Walk upwards from cwd
         $dir = $cwd;
         for ($i = 0; $i < 10; $i++) {
-            $candidate = $dir . '/bootstrap/artisan.php';
+            $candidate = $dir . '/bootstrap/app.php';
             if (file_exists($candidate)) {
                 return $candidate;
             }
