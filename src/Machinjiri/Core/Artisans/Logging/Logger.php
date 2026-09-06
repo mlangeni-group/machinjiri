@@ -222,7 +222,7 @@ class Logger
         $directory = dirname($this->logFile);
         // Write with exclusive lock (atomic append)
         
-        $fp = fopen($this->logFile, 'ab');
+        $fp = @fopen($this->logFile, 'ab');
         
         if ($fp === false) {
             // Fallback: error_log
