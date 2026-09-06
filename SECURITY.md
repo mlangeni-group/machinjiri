@@ -7,12 +7,20 @@ This framework is actively maintained and supported for the following versions:
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 1.2.1   | :white_check_mark: |
-| 2.0.0   | :white_check_mark: |
+| 2.1.4   | :white_check_mark: |
+| 2.1.5   | :white_check_mark: |
+| 2.1.6   | :white_check_mark: |
+| 2.1.7   | :white_check_mark: |
+| 2.1.8   | :white_check_mark: |
+| 2.1.9   | :white_check_mark: |
+| 2.2.0   | :white_check_mark: |
+| 2.2.1   | :white_check_mark: |
+| 2.2.2   | :white_check_mark: |
+| 2.2.3   | :white_check_mark: |
 
 
 ## Reporting a Vulnerability
-If you discover a security vulnerability within this framework, please send an email to [precious.lyson@gmail.com](mailto:[precious.lyson@gmail.com). All security reports will be reviewed and addressed in a timely manner.
+If you discover a security vulnerability within this framework, please send an email to [mlangenigroupqm@gmail.com](mailto:[mlangenigroupqm@gmail.com). All security reports will be reviewed and addressed in a timely manner.
 
 Please ensure you are using the latest version to benefit from security updates.
 
@@ -24,4 +32,4 @@ Please ensure you are using the latest version to benefit from security updates.
 
 ## Updates to This Policy
 This policy will be reviewed periodically and updated as necessary. 
-Last updated: 2026-03-14
+Last updated: 2026-09-06
