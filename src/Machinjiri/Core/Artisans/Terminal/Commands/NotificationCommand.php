@@ -8,7 +8,6 @@ use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Style\SymfonyStyle;
-
 use Mlangeni\Machinjiri\Core\Artisans\Generators\NotificationGenerator;
 use Mlangeni\Machinjiri\Core\Components\Notification\NotificationManager;
 use Mlangeni\Machinjiri\Core\Components\Notification\Notification;
@@ -18,15 +17,23 @@ use Mlangeni\Machinjiri\Core\Components\Notification\Contracts\ChannelInterface;
 use Mlangeni\Machinjiri\Core\Components\Notification\NotificationResponse;
 use Mlangeni\Machinjiri\Core\Components\Notification\NotificationResult;
 
+trait helperTrait {
+    
+    private function resolveNotificationClass(string $name): string
+    {
+        if (str_contains($name, '\\')) {
+            return ltrim($name, '\\');
+        }
+
+        return 'App\\Notifications\\' . $name;
+    }
+}
+
 class NotificationCommand
 {
     public static function getCommands(): array
     {
         return [
-
-            /* ============================================================
-             |  make:notification
-             | ============================================================ */
             new class extends Command {
                 use CommandHelper;
 
@@ -102,7 +109,7 @@ class NotificationCommand
                         foreach ($channels as $name) {
                             try {
                                 $instance = $manager->channels()->channel($name);
-                                $rows[] = [$name, is_object($instance) ? get_class($instance) : "callback function", '<fg=green>ok</>'];
+                                $rows[] = [$name, is_object($instance) ? get_class($instance) : "callback function", '<fg=green>Ok</>'];
                             } catch (\Throwable $e) {
                                 $rows[] = [$name, '—', '<fg=red>' . $e->getMessage() . '</>'];
                             }
@@ -119,9 +126,6 @@ class NotificationCommand
                 }
             },
 
-            /* ============================================================
-             |  notify:list
-             | ============================================================ */
             new class extends Command {
                 use CommandHelper;
 
@@ -142,7 +146,7 @@ class NotificationCommand
                         $dir = $input->getOption('path') ?? $this->resolveNotificationsDirectory();
 
                         if (!is_dir($dir)) {
-                            $ss->warning("Notifications directory not found: {$dir}");
+                            $ss->warning("Notifications directory not found");
                             return Command::SUCCESS;
                         }
 
@@ -156,7 +160,7 @@ class NotificationCommand
                         $rows = [];
                         foreach ($files as $file) {
                             $class = 'App\\Notifications\\' . basename($file, '.php');
-                            $rows[] = [$class, file_exists($file) ? '<fg=green>yes</>' : '<fg=red>no</>'];
+                            $rows[] = [$class, file_exists($file) ? '<fg=green>Yes</>' : '<fg=red>No</>'];
                         }
 
                         $ss->table(['Notification Class', 'Exists'], $rows);
@@ -166,21 +170,16 @@ class NotificationCommand
 
                 private function resolveNotificationsDirectory(): string
                 {
-                    $base = method_exists($this->artisanContainer(), 'getBasePath')
-                        ? $this->artisanContainer()->getBasePath()
-                        : (property_exists($this->artisanContainer(), 'basePath')
-                            ? $this->artisanContainer()->basePath
-                            : dirname(__DIR__, 5));
+                    if (function_exists('app_path')) {
+                        return app_path('Notifications');
+                    }
 
-                    return rtrim($base, '/\\') . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'Notifications';
+                    return $this->artisanContainer()->app . 'Notifications';
                 }
             },
 
-            /* ============================================================
-             |  notify:show
-             | ============================================================ */
             new class extends Command {
-                use CommandHelper;
+                use CommandHelper, helperTrait;
 
                 public function __construct()
                 {
@@ -214,8 +213,8 @@ class NotificationCommand
                         $ss->horizontalTable(['Property', 'Value'], [
                             ['Class',      $fqcn],
                             ['Extends',    get_parent_class($fqcn)],
-                            ['Abstract',   $ref->isAbstract() ? 'yes' : 'no'],
-                            ['Final',      $ref->isFinal() ? 'yes' : 'no'],
+                            ['Abstract',   $ref->isAbstract() ? 'Yes' : 'No'],
+                            ['Final',      $ref->isFinal() ? 'Yes' : 'No'],
                         ]);
 
                         $ss->section('Channel payload methods');
@@ -257,11 +256,8 @@ class NotificationCommand
                 }
             },
 
-            /* ============================================================
-             |  notify:send
-             | ============================================================ */
             new class extends Command {
-                use CommandHelper;
+                use CommandHelper, helperTrait;
 
                 public function __construct()
                 {
@@ -434,14 +430,11 @@ class NotificationCommand
 
                     $ss->writeln('');
                     $ss->writeln($result->isSuccessful()
-                        ? '  <fg=green>✔ All channels delivered.</>'
-                        : '  <fg=red>✘ One or more channels failed.</>');
+                        ? '  <fg=green>All channels delivered.</>'
+                        : '  <fg=red>One or more channels failed.</>');
                 }
             },
 
-            /* ============================================================
-             |  notify:test
-             | ============================================================ */
             new class extends Command {
                 use CommandHelper;
 
@@ -557,10 +550,7 @@ class NotificationCommand
                     });
                 }
             },
-
-            /* ============================================================
-             |  notify:events
-             | ============================================================ */
+            
             new class extends Command {
                 use CommandHelper;
 
@@ -586,18 +576,5 @@ class NotificationCommand
 
         ];
     }
-
-    /* ================================================================
-     |  Shared helpers (duplicated per command because each is an
-     |  anonymous class; keep the trait free of class-level state).
-     | ================================================================ */
-
-    private static function resolveNotificationClassStatic(string $name): string
-    {
-        if (str_contains($name, '\\')) {
-            return ltrim($name, '\\');
-        }
-
-        return 'App\\Notifications\\' . $name;
-    }
+    
 }

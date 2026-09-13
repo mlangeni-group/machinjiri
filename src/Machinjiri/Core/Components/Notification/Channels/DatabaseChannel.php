@@ -8,10 +8,11 @@ use Mlangeni\Machinjiri\Core\Components\Notification\Contracts\NotificationStore
 use Mlangeni\Machinjiri\Core\Components\Notification\Notification;
 use Mlangeni\Machinjiri\Core\Components\Notification\NotificationResponse;
 use Mlangeni\Machinjiri\Core\Components\Notification\Stores\LoggerNotificationStore;
+use Mlangeni\Machinjiri\Core\Database\Builders\QueryBuilder;
 
 class DatabaseChannel implements ChannelInterface
 {
-    public function __construct(private NotificationStoreInterface $store) {}
+    public function __construct(private QueryBuilder $queryBuilder) {}
 
     public static function withFallback(): self
     {
@@ -41,12 +42,14 @@ class DatabaseChannel implements ChannelInterface
         ]);
 
         try {
-            $record = $this->store->store(
+            $result = $this->store(
                 $notifiable->getNotifiableId(),
                 $this->name(),
                 $payload,
                 $notification->id()
             );
+
+            $record = (isset($result['lastInsertId']) && $result['lastInsertId']) ? $result['lastInsertId'] : 0;
 
             return NotificationResponse::success($this->name(), $record);
         } catch (\Throwable $e) {
@@ -56,5 +59,17 @@ class DatabaseChannel implements ChannelInterface
                 ['exception' => get_class($e)]
             );
         }
+    }
+
+    private function store(string $id, string $name, array $payload, mixed $notificationId): array 
+    {
+        return $this->queryBuilder
+            ->insert([
+                "notifierId" => $id,
+                "name" => $name,
+                "payload" => json_encode($payload),
+                "notificationId" => $notificationId
+            ])
+            ->execute();
     }
 }

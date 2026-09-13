@@ -22,6 +22,7 @@ use Mlangeni\Machinjiri\Core\Components\Notification\ChannelManager;
 use Mlangeni\Machinjiri\Core\Components\Notification\Channels\{MailChannel, SmsChannel, DatabaseChannel, WebhookChannel};
 use Mlangeni\Machinjiri\Core\Transport\Mail\MailManager;
 use Mlangeni\Machinjiri\Core\Transport\SMS\SMSManager;
+use Mlangeni\Machinjiri\Core\Database\Builders\QueryBuilder;
 
 class NotificationServiceProvider extends ServiceProvider
 {
@@ -61,6 +62,15 @@ class NotificationServiceProvider extends ServiceProvider
 
         $this->singleton(SmsChannel::class, function($app) {
             return new SmsChannel($app->resolve(SMSManager::class));
+        });
+
+        $this->singleton(WebhookChannel::class, function($app) {
+            return new WebhookChannel($app->resolve(Logger::class));
+        });
+
+        $this->singleton(DatabaseChannel::class, function($app) {
+            $table = $app->configurations['notification_table'] ?? 'database_channel_notifications';
+            return new DatabaseChannel(new QueryBuilder($table));
         });
 
         // -------------------- Aliases for Convenience --------------------

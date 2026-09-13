@@ -2,11 +2,14 @@
 
 namespace Mlangeni\Machinjiri\Core\Components\Notification\Channels;
 
+use Mlangeni\Machinjiri\Core\Container;
 use Mlangeni\Machinjiri\Core\Artisans\Logging\Logger;
 use Mlangeni\Machinjiri\Core\Components\Notification\Contracts\ChannelInterface;
 use Mlangeni\Machinjiri\Core\Components\Notification\Contracts\NotifiableInterface;
 use Mlangeni\Machinjiri\Core\Components\Notification\Notification;
 use Mlangeni\Machinjiri\Core\Components\Notification\NotificationResponse;
+use Mlangeni\Machinjiri\Core\Http\{HttpRequest, HttpResponse, HttpClient};
+use Mlangeni\Machinjiri\Core\Exceptions\MachinjiriException;
 
 class WebhookChannel implements ChannelInterface
 {
@@ -53,41 +56,34 @@ class WebhookChannel implements ChannelInterface
             $headers[] = 'X-Notification-Signature: ' . hash_hmac('sha256', $body, $payload['secret']);
         }
 
-        $ch = curl_init($url);
-        curl_setopt_array($ch, [
-            CURLOPT_POST           => true,
-            CURLOPT_POSTFIELDS     => $body,
-            CURLOPT_HTTPHEADER     => $headers,
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT        => (int) ($payload['timeout'] ?? 10),
-            CURLOPT_CONNECTTIMEOUT => (int) ($payload['connect_timeout'] ?? 5),
-        ]);
+        try {
+             $request = (Container::instancePresent()) 
+                ? Container::getInstance()->resolve(HttpRequest::class)
+                : HttpRequest::createFromGlobals();
+    
+            $response = $request->api($url, 'POST', $body, $headers); 
 
-        $responseBody = curl_exec($ch);
-        $status       = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $error        = curl_error($ch);
-        curl_close($ch);
+            $status = $response->getStatusCode();
 
-        if ($error) {
+            if ($status >= 200 && $status < 300) {
+                return NotificationResponse::success($this->name(), [
+                    'status' => $status,
+                    'body'   => $response->getBody(),
+                ], ['url' => $url]);
+            }
+
+            return NotificationResponse::failure(
+                $this->name(),
+                "Webhook responded with HTTP {$status}.",
+                ['url' => $url, 'status' => $status, 'body' => $responseBody]
+            );
+            
+        } catch (MachinjiriException $e) {
             $this->logger->error('Webhook notification failed (transport error)', [
                 'url'   => $url,
                 'error' => $error,
             ]);
-
             return NotificationResponse::failure($this->name(), $error, ['url' => $url]);
         }
-
-        if ($status >= 200 && $status < 300) {
-            return NotificationResponse::success($this->name(), [
-                'status' => $status,
-                'body'   => $responseBody,
-            ], ['url' => $url]);
-        }
-
-        return NotificationResponse::failure(
-            $this->name(),
-            "Webhook responded with HTTP {$status}.",
-            ['url' => $url, 'status' => $status, 'body' => $responseBody]
-        );
     }
 }

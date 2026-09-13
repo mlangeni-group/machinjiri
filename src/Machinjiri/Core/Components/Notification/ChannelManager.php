@@ -75,8 +75,10 @@ class ChannelManager
     private function bundledChannels(): array 
     {
         return [
+            'database' => \Mlangeni\Machinjiri\Core\Components\Notification\Channels\DatabaseChannel::class,
             'mail' => \Mlangeni\Machinjiri\Core\Components\Notification\Channels\MailChannel::class,
             'sms' => \Mlangeni\Machinjiri\Core\Components\Notification\Channels\SmsChannel::class,
+            'webhook' => \Mlangeni\Machinjiri\Core\Components\Notification\Channels\WebhookChannel::class,
         ];
     }
 

@@ -3,6 +3,7 @@
 namespace Mlangeni\Machinjiri\Core\Components\Notification;
 
 use Mlangeni\Machinjiri\Core\Components\Notification\Contracts\NotifiableInterface;
+use Mlangeni\Machinjiri\Core\Components\UUID\Random\UuidGenerator;
 
 abstract class Notification
 {
@@ -97,7 +98,7 @@ abstract class Notification
 
     protected function generateId(): string
     {
-        return bin2hex(random_bytes(16));
+        return UuidGenerator::v1()->toString();
     }
 
     public function __serialize(): array

@@ -15,4 +15,5 @@ interface NotificationStoreInterface
         array $payload,
         ?string $notificationId = null
     ): mixed;
+    
 }
