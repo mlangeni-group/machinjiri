@@ -13,6 +13,7 @@ use Mlangeni\Machinjiri\Core\Components\Notification\Jobs\SendNotificationJob;
 use Mlangeni\Machinjiri\Core\Container;
 use Mlangeni\Machinjiri\Core\Transport\Mail\MailManager;
 use Mlangeni\Machinjiri\Core\Transport\SMS\SMSManager;
+use Mlangeni\Machinjiri\Core\Database\Builders\QueryBuilder;
 
 class NotificationManager
 {
@@ -41,8 +42,8 @@ class NotificationManager
             ? $app->make(EventListener::class)
             : null);
 
-        $this->dispatcher = $dispatcher ?? ($app->bound(JobDispatcherInterface::class)
-            ? $app->make(JobDispatcherInterface::class)
+        $this->dispatcher = $dispatcher ?? ($app->bound('queue.dispatcher')
+            ? $app->make('queue.dispatcher')
             : null);
 
         $this->channels = $channels ?? $this->buildDefaultChannelManager();
@@ -126,7 +127,7 @@ class NotificationManager
     {
         if (!$this->dispatcher) {
             throw new NotificationException(
-                'Job dispatcher not configured. Bind a JobDispatcherInterface implementation.',
+                'Job dispatcher not bound in Container',
                 500,
                 null,
                 [],
@@ -163,10 +164,6 @@ class NotificationManager
 
         return $ids;
     }
-
-    /* -----------------------------------------------------------------
-     |  Internals
-     | ----------------------------------------------------------------- */
 
     /**
      * @param NotifiableInterface|NotifiableInterface[] $notifiables
@@ -318,14 +315,15 @@ class NotificationManager
     {
         $manager = new ChannelManager($this->app);
 
-        // Mail – resolved lazily; MailManager is registered as a singleton in the container.
         $manager->register('mail', function (Container $app) {
             /** @var MailManager $mailer */
             $mailer = $app->bound(MailManager::class)
                 ? $app->make(MailManager::class)
                 : $app->make(MailManager::class);
 
-            return new MailChannel($mailer);
+            return $app->bound(MailChannel::class)
+                ? $app->resolve(MailChannel::class)
+                : new MailChannel($mailer);
         });
 
         // SMS
@@ -335,23 +333,21 @@ class NotificationManager
                 ? $app->make(SMSManager::class)
                 : $app->make(SMSManager::class);
 
-            return new SmsChannel($sms);
+            return $app->bound(SmsChannel::class)
+                ? $app->resolve(SmsChannel::class)
+                : new SmsChannel($sms);
         });
 
-        // Database – uses a bound NotificationStoreInterface if available.
         $manager->register('database', function (Container $app) {
-            $store = $app->bound(Contracts\NotificationStoreInterface::class)
-                ? $app->make(Contracts\NotificationStoreInterface::class)
-                : null;
-
-            return $store
-                ? new DatabaseChannel($store)
-                : DatabaseChannel::withFallback();
+            return $app->bound(DatabaseChannel::class) 
+                ? $app->resolve(DatabaseChannel::class)
+                : new DatabaseChannel(new QueryBuilder($app->configurations['notification_table'] ?? 'database_channel_notifications'));
         });
 
-        // Webhook
         $manager->register('webhook', function (Container $app) {
-            return new WebhookChannel($this->logger);
+            return $app->bound(WebhookChannel::class) 
+                ? $app->resolve(WebhookChannel::class)
+                : new WebhookChannel($this->logger);
         });
 
         return $manager;
