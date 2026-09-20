@@ -24,7 +24,7 @@ trait Notifiable
     public function routeNotificationFor(string $channel): mixed
     {
         return match ($channel) {
-            'mail'    => $this->email ?? $this->email_address ?? null,
+            'mail'    => $this->email ?? $this->email_address ?? $this->emailAddress ?? null,
             'sms'     => $this->phone ?? $this->phone_number ?? $this->mobile ?? null,
             'webhook' => $this->webhook_url ?? null,
             default   => null,

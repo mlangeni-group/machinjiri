@@ -26,6 +26,8 @@ class Logger
     protected array $defaultContext = [];
     protected bool $includeBacktrace = false;
 
+    private string $referrer;
+
     public function __construct(
         ?string $logFile = null,
         string $minLevel = self::DEBUG,
@@ -33,8 +35,9 @@ class Logger
         ?string $subdirectory = null,
         ?string $referrer = null
     ) {
+        $this->referrer = $referrer ?? 'app';
         
-        $this->path = self::resolveLogPath($referrer, $isEvent, $subdirectory);
+        $this->path = self::resolveLogPath($isEvent);
 
         $this->logFile = self::createLogFile($this->path, $logFile);
 
@@ -75,59 +78,21 @@ class Logger
         $this->defaultContext = [];
     }
 
-    public function setFilesystem(Filesystem $filesystem): void
-    {
-        $this->filesystem = $filesystem;
-    }
-
     protected function createLogFile(string $path, ?string $logFile = null): string
     {
-        $this->logFilename = str_replace(['-', '/', '*', ':'], '_', strtolower($logFile ?? "log"));
-        return $path . $this->logFilename . '_' . date('Y-m-d') . '.log';
+        $this->logFilename = str_replace(['-', '/', '*', ':'], '.', strtolower($logFile ?? "log"));
+        return $path . $this->referrer . '.' . $this->logFilename . '.log';
     }
 
-    protected function resolveLogPath(?string $referrer = null, ?bool $isEvent = false, ?string $subdirectory = null): string
+    protected function resolveLogPath(?bool $isEvent = false): string
     {
         $path = self::getLogsRoot();
-        $referrers = ['system', 'app'];
         $type = $isEvent ? 'events' : 'reports';
+        $path = $path . $this->referrer . DIRECTORY_SEPARATOR . $type . DIRECTORY_SEPARATOR . date('Y-m-d') . DIRECTORY_SEPARATOR;
 
-        if ($referrer === null || !in_array($referrer, $referrers, true)) {
-            $referrer = 2;
-        }
-        $structure[] = ($referrer !== 1) ? $referrers[array_search($referrer, $referrers, true)] : $referrers[$referrer];
+        if (!is_dir($path)) @mkdir($path);
 
-        if ($subdirectory !== null && !empty($subdirectory)) {
-            $subdirectories = explode(
-                DIRECTORY_SEPARATOR,
-                rtrim(str_replace('\\', DIRECTORY_SEPARATOR, trim($subdirectory)), DIRECTORY_SEPARATOR)
-            );
-            foreach ($subdirectories as $dir) {
-                if (!empty($dir)) $structure[] = $dir;
-            }
-        }
-        
-        $structure[] = $type;
-
-        $path =  $path . implode(DIRECTORY_SEPARATOR, $structure) . DIRECTORY_SEPARATOR;
-        
-        return (is_dir($path)) ? $path : self::buildDir($structure);
-    }
-
-    private static function buildDir(array $subdirectories): string 
-    {
-        $base = self::getLogsRoot();
-        if (count($subdirectories) > 0) {
-            $directory = $base;
-            foreach ($subdirectories as $subdirectory) {
-                if (empty($subdirectory)) continue;
-                $directory .= $subdirectory . DIRECTORY_SEPARATOR;
-                if (!is_dir($directory)) 
-                    mkdir($directory, 0755);
-            }
-            return $directory;
-        }
-        return $base;
+        return $path;
     }
     
     protected static function getLogsRoot(): string

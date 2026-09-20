@@ -46,9 +46,9 @@ class ErrorHandler
 
         ErrorThrottle::setConfig($config['throttle'] ?? []);
         ErrorReporter::setReportErrors(self::shouldReport($config));
-        ErrorReporter::setEventListener(new EventListener(LoggerFactory::system("error-handler", "exception", true)));
+        ErrorReporter::setEventListener(new EventListener(LoggerFactory::system("exceptions", "exception", true)));
 
-        $logger = LoggerFactory::system("error-handler", "exception", false);
+        $logger = LoggerFactory::system("exceptions", "exception", false);
         ErrorLogger::setLogger($logger);
         ErrorThrottle::setLogger($logger);
         ErrorReporter::setLogger($logger);

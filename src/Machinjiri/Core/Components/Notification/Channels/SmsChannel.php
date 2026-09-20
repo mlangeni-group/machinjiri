@@ -8,6 +8,7 @@ use Mlangeni\Machinjiri\Core\Components\Notification\Notification;
 use Mlangeni\Machinjiri\Core\Components\Notification\NotificationResponse;
 use Mlangeni\Machinjiri\Core\Transport\SMS\Message;
 use Mlangeni\Machinjiri\Core\Transport\SMS\SMSManager;
+use Mlangeni\Machinjiri\Core\Transport\SMS\Builder\MessageBuilder;
 
 class SmsChannel implements ChannelInterface
 {
@@ -32,7 +33,7 @@ class SmsChannel implements ChannelInterface
         try {
             $message = $payload instanceof Message
                 ? $payload
-                : $this->buildMessage($payload, $notifiable);
+                : Message::fromArray($payload);
 
             $async = $notification->queueName() !== null;
             $response = $this->smsManager->send($message, $async);
@@ -47,16 +48,4 @@ class SmsChannel implements ChannelInterface
         }
     }
 
-    protected function buildMessage(mixed $payload, NotifiableInterface $notifiable): Message
-    {
-        $to   = is_array($payload) && isset($payload['to'])
-            ? $payload['to']
-            : $notifiable->routeNotificationFor('sms');
-
-        $body = is_array($payload)
-            ? (string) ($payload['body'] ?? $payload['message'] ?? '')
-            : (string) $payload;
-
-        return new Message($to, $body);
-    }
 }

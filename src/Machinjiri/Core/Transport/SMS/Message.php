@@ -36,7 +36,7 @@ class Message
         }
 
         if (isset($build['text'])) {
-            $message->text($build['text']);
+            $message->text($build['text'] ?? $build['body']);
         }
 
         if (isset($build['from'])) {

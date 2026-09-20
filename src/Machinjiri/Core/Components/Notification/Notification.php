@@ -11,9 +11,9 @@ abstract class Notification
     protected ?string $queueName = null;
     protected ?int $delay = null;
 
-    public function __construct()
+    public function __construct(?string $id = null)
     {
-        $this->id = $this->id ?? $this->generateId();
+        $this->id = $id ?? $this->generateId();
     }
 
     /**
@@ -27,9 +27,9 @@ abstract class Notification
      |  Routing / scheduling
      | ----------------------------------------------------------------- */
 
-    public function id(): string
+    public function id(): ?string
     {
-        return $this->id;
+        return $this->id ?? $this->generateId();
     }
 
     public function onQueue(?string $queue): static
