@@ -591,8 +591,6 @@ class Container
             }
 
             DatabaseConnection::setConfig($dbConfig);
-
-            $this->listener->trigger('db.connected.driver.' . DatabaseConnection::getDriver());
         } catch (MachinjiriException $e) {
             $dbLogger->critical(
                 "Connection failed \ndriver => {driver}\nerror => {message}",

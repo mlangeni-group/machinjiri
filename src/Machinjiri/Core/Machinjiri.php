@@ -120,8 +120,6 @@ final class Machinjiri extends Container
         self::setInstance($this);
 
         ErrorHandler::register($this, $dev);
-
-        $this->listener->trigger('app.initialize');
     }
     
     /**
@@ -198,13 +196,6 @@ final class Machinjiri extends Container
     public function bind(string $abstract, $concrete = null, bool $shared = false): void
     {
         parent::bind($abstract, $concrete, $shared);
-        
-        // Trigger event when service is bound
-        $this->listener->trigger('container.bound', [
-            'abstract' => $abstract,
-            'concrete' => $concrete,
-            'shared' => $shared
-        ]);
     }
     
     /**
@@ -217,12 +208,6 @@ final class Machinjiri extends Container
     public function singleton(string $abstract, $concrete = null): void
     {
         parent::singleton($abstract, $concrete);
-        
-        // Trigger event when singleton is registered
-        $this->listener->trigger('container.singleton', [
-            'abstract' => $abstract,
-            'concrete' => $concrete
-        ]);
     }
     
     /**
@@ -235,12 +220,6 @@ final class Machinjiri extends Container
     public function alias(string $abstract, string $alias): void
     {
         parent::alias($abstract, $alias);
-        
-        // Trigger event when alias is registered
-        $this->listener->trigger('container.alias', [
-            'abstract' => $abstract,
-            'alias' => $alias
-        ]);
     }
     
     /**
@@ -296,9 +275,6 @@ final class Machinjiri extends Container
     public function unbind(string $abstract): void
     {
         parent::unbind($abstract);
-        
-        // Trigger event when service is unbound
-        $this->listener->trigger('container.unbound', ['abstract' => $abstract]);
     }
     
     /**
@@ -309,9 +285,6 @@ final class Machinjiri extends Container
     public function flush(): void
     {
         parent::flush();
-        
-        // Trigger event when container is flushed
-        $this->listener->trigger('container.flushed');
     }
     
     /**
@@ -326,9 +299,6 @@ final class Machinjiri extends Container
         
         // Set up paths
         $this->setupPaths();
-        
-        // Trigger initialization event
-        $this->listener->trigger('app.initializing');
     }
     
     /**
