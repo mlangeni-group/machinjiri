@@ -2,17 +2,18 @@
 
 Machinjiri is a **flexible, powerful PHP framework** designed for rapid web development. Built for PHP 8.4+, it provides a modular architecture, elegant routing system, comprehensive database abstraction, authentication and authorization, and robust security features. Designed for speed, scalability, and developer experience, Machinjiri empowers developers to build secure, maintainable applications efficiently.
 
-Current stable version: `2.2.4`
+Current stable version: `2.2.5`
 
-## What’s New in 2.2.4
+## What’s New in 2.2.5
 
+- Upgraded the framework to **PHP 8.3+** support, with compatibility for modern PHP 8.4 runtimes
 - Added a persistent task scheduler with cron expressions, queued execution, overlap locks, task groups, priorities, retries, caching, and health checks
 - Added scheduler Artisan commands for creating, listing, running, enabling, disabling, and inspecting scheduled tasks
 - Improved webhook processing with provider subscriptions, configurable synchronous or asynchronous handling, signature verification, response handling, and idempotency support
-- Reworked exception handling into separate context, logging, reporting, rendering, and throttling services
 - Added configurable SMS transports with synchronous delivery and queue-backed asynchronous delivery
-- Updated core routing, middleware resolution, service-provider loading, generators, and mail integration
-- Updated framework support to **PHP 8.4+** and package version `2.2.2`
+- Expanded the notification layer with mail, SMS, database, and webhook channels
+- Reworked exception handling into separate context, logging, reporting, rendering, and throttling services
+- Updated core routing, middleware resolution, service-provider loading, generators, and mail integration for more reliable app bootstrapping
 
 ## Table of Contents
 
@@ -197,7 +198,7 @@ Machinjiri is designed to accelerate web development with:
 
 ## System Requirements
 
-- **PHP**: 8.4 or higher
+- **PHP**: 8.3 or higher (compatible with PHP 8.4)
 - **Extensions**:
   - PDO (for database support)
   - cURL (for HTTP client)
