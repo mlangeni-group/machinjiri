@@ -17,13 +17,25 @@ class RouteHandlerResolver implements HandlerResolverInterface
 
         if (is_string($handler) && str_contains($handler, '@')) {
             [$controller, $method] = explode('@', $handler, 2);
-            $controllerClass = "App\\Controllers\\$controller";
+
+            // Support both fully-qualified class names and short names
+            $controller = ltrim($controller, '\\');
+            $controllerClass = str_contains($controller, '\\')
+                ? $controller
+                : "App\\Controllers\\{$controller}";
+
             if (!class_exists($controllerClass)) {
-                throw new MachinjiriException("Controller class '$controllerClass' not found");
+                // fallback to config namespace
+                $controllerClass = "App\\Controllers\\{$controller}";
             }
+
+            if (!class_exists($controllerClass)) {
+                throw new MachinjiriException("Controller class '{$controllerClass}' not found");
+            }
+
             $instance = new $controllerClass();
             if (!method_exists($instance, $method)) {
-                throw new MachinjiriException("Method '$method' not found in controller '$controllerClass'");
+                throw new MachinjiriException("Method '{$method}' not found in controller '{$controllerClass}'");
             }
             return call_user_func_array([$instance, $method], array_merge([$request, $response], $params));
         }
@@ -38,7 +50,7 @@ class RouteHandlerResolver implements HandlerResolverInterface
                 throw new MachinjiriException("Invalid controller in route handler array");
             }
             if (!method_exists($instance, $method)) {
-                throw new MachinjiriException("Method '$method' not found in " . get_class($instance));
+                throw new MachinjiriException("Method '{$method}' not found in " . get_class($instance));
             }
             return call_user_func_array([$instance, $method], array_merge([$request, $response], $params));
         }

@@ -7,6 +7,8 @@ use Mlangeni\Machinjiri\Core\Exceptions\MachinjiriException;
 use Mlangeni\Machinjiri\Core\Http\HttpRequest;
 use Mlangeni\Machinjiri\Core\Http\HttpResponse;
 use Mlangeni\Machinjiri\Core\Views\View;
+use Mlangeni\Machinjiri\Core\Routing\Attributes\Cors as CorsAttribute;
+use Mlangeni\Machinjiri\Core\Routing\Attributes\Middleware as MiddlewareAttribute;
 
 class Router
 {
@@ -168,6 +170,16 @@ class Router
     public static function bind(string $param, string|callable $resolver): self
     {
         return self::getInstance()->addBinding($param, $resolver);
+    }
+
+    public static function controller(string $controllerClass): self
+    {
+        return self::getInstance()->registerController($controllerClass);
+    }
+
+    public static function controllers(array $controllerClasses): self
+    {
+        return self::getInstance()->registerControllers($controllerClasses);
     }
 
     // Instance methods
@@ -794,6 +806,24 @@ class Router
 </body>
 </html>
 HTML;
+    }
+
+    /**
+     * Register all routes declared with PHP attributes on a controller.
+     */
+    public function registerController(string $controllerClass): self
+    {
+        (new AttributeRouteRegistrar($this))->register($controllerClass);
+        return $this;
+    }
+
+    /**
+     * Register attribute-declared routes for many controllers.
+     */
+    public function registerControllers(array $controllerClasses): self
+    {
+        (new AttributeRouteRegistrar($this))->registerMany($controllerClasses);
+        return $this;
     }
 
 }
