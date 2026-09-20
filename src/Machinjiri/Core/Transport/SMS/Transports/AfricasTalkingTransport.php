@@ -32,8 +32,8 @@ class AfricasTalkingTransport extends AbstractTransport implements TransportInte
         }
         
         $this->at = new AfricasTalking(
-            $this->getConfig()['username'],
-            $this->getConfig()['apiKey']
+            $this->getConfig()['username'] ?? '',
+            $this->getConfig()['api_key'] ?? ''
         );
     }
 

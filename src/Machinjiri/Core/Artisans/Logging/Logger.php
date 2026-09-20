@@ -4,7 +4,6 @@ namespace Mlangeni\Machinjiri\Core\Artisans\Logging;
 
 use Mlangeni\Machinjiri\Core\Container;
 use Mlangeni\Machinjiri\Core\Exceptions\MachinjiriException;
-use Mlangeni\Machinjiri\Core\FileSystem\FileSystem;
 use Mlangeni\Machinjiri\Core\FileSystem\Adapters\LocalAdapter;
 
 class Logger
@@ -18,13 +17,16 @@ class Logger
     public const INFO      = 'info';
     public const DEBUG     = 'debug';
 
-    protected Filesystem $filesystem;
+    protected LocalAdapter $localAdapter;
+
     protected string $logFile;         // absolute path
     protected string $logFilename;
     protected string $minLevel;
     protected string $path;
     protected array $defaultContext = [];
     protected bool $includeBacktrace = false;
+
+    private string $referrer;
 
     public function __construct(
         ?string $logFile = null,
@@ -33,18 +35,16 @@ class Logger
         ?string $subdirectory = null,
         ?string $referrer = null
     ) {
+        $this->referrer = $referrer ?? 'app';
         
-        $this->path = self::resolveLogPath($referrer, $isEvent, $subdirectory);
+        $this->path = self::resolveLogPath($isEvent);
 
         $this->logFile = self::createLogFile($this->path, $logFile);
 
         $this->minLevel = $_ENV['LOG_LEVEL'] ?? $minLevel;
 
-        $root = self::getLogsRoot();
-        $adapter = new LocalAdapter($root);
-        $this->filesystem = new FileSystem($adapter);
+        $this->localAdapter = new LocalAdapter(dirname($this->logFile));
 
-        // 5. Optionally include backtrace for DEBUG level
         $this->includeBacktrace = ($this->minLevel === self::DEBUG);
     }
 
@@ -78,66 +78,34 @@ class Logger
         $this->defaultContext = [];
     }
 
-    public function setFilesystem(Filesystem $filesystem): void
-    {
-        $this->filesystem = $filesystem;
-    }
-
     protected function createLogFile(string $path, ?string $logFile = null): string
     {
-        $this->logFilename = $logFile ?? "log";
-        return $path . str_replace(['-', ' '], '_',  $this->logFilename . '[' . date('Ymd') . '].log');
+        $this->logFilename = str_replace(['-', '/', '*', ':'], '.', strtolower($logFile ?? "log"));
+        return $path . $this->referrer . '.' . $this->logFilename . '.log';
     }
 
-    protected function resolveLogPath(?string $referrer = null, ?bool $isEvent = false, ?string $subdirectory = null): string
+    protected function resolveLogPath(?bool $isEvent = false): string
     {
         $path = self::getLogsRoot();
-        $referrers = ['system', 'app'];
         $type = $isEvent ? 'events' : 'reports';
+        $path = $path . $this->referrer . DIRECTORY_SEPARATOR . $type . DIRECTORY_SEPARATOR . date('Y-m-d') . DIRECTORY_SEPARATOR;
 
-        if ($referrer === null || !in_array($referrer, $referrers, true)) {
-            $referrer = 2;
-        }
-        $structure[] = ($referrer !== 1) ? $referrers[array_search($referrer, $referrers, true)] : $referrers[$referrer];
+        if (!is_dir($path)) @mkdir($path);
 
-        if ($subdirectory !== null && !empty($subdirectory)) {
-            $subdirectories = explode(
-                DIRECTORY_SEPARATOR,
-                rtrim(str_replace('\\', DIRECTORY_SEPARATOR, trim($subdirectory)), DIRECTORY_SEPARATOR)
-            );
-            foreach ($subdirectories as $dir) {
-                if (!empty($dir)) $structure[] = $dir;
-            }
-        }
-        
-        $structure[] = $type;
-
-        $path =  $path . implode(DIRECTORY_SEPARATOR, $structure) . DIRECTORY_SEPARATOR;
-        
-        return (is_dir($path)) ? $path : self::buildDir($structure);
-    }
-
-    private static function buildDir(array $subdirectories): string 
-    {
-        $base = self::getLogsRoot();
-        if (count($subdirectories) > 0) {
-            $directory = $base;
-            foreach ($subdirectories as $subdirectory) {
-                if (empty($subdirectory)) continue;
-                $directory .= $subdirectory . DIRECTORY_SEPARATOR;
-                if (!is_dir($directory)) 
-                    mkdir($directory, 0755);
-            }
-            return $directory;
-        }
-        return $base;
+        return $path;
     }
     
     protected static function getLogsRoot(): string
     {
-        return (Container::instancePresent())
-            ? Container::getInstance()->storage . 'logs/'
-            : Container::getSystemTempDir() . '/logs/';
+        if (Container::instancePresent()) {
+            return Container::getInstance()->storage . '/logs/';
+        }
+
+        if (function_exists('storage_path')) {
+            return storage_path('logs/');
+        }
+
+        return Container::getSystemTempDir() . 'logs/';
     }
 
     protected function shouldLog(string $level): bool
@@ -218,23 +186,23 @@ class Logger
 
     protected function writeToLog(string $logEntry): void
     {
-        // Ensure the directory exists using the Filesystem (LocalAdapter)
-        $directory = dirname($this->logFile);
-        // Write with exclusive lock (atomic append)
-        
-        $fp = @fopen($this->logFile, 'ab');
-        
-        if ($fp === false) {
-            // Fallback: error_log
-            error_log('Logger: cannot open log file: ' . $this->logFile);
+        try {
+            if (!is_file($this->logFile)) {
+                $this->localAdapter->write($this->logFilename(), $logEntry);
+                return;
+            }
+
+            $this->localAdapter->append($this->logFilename(), $logEntry);
             return;
+        } catch (MachinjiriException $e) {
+            // continue
+            error_log($e->getMessage(), 3, $this->getLogsRoot() . '/error.log');
         }
-        if (flock($fp, LOCK_EX)) {
-            fwrite($fp, $logEntry);
-            fflush($fp);
-            flock($fp, LOCK_UN);
-        }
-        fclose($fp);
+    }
+
+    private function logFileName(): string 
+    {
+        return basename($this->logFile);
     }
 
     /**
@@ -248,11 +216,6 @@ class Logger
                 throw new MachinjiriException("Unable to create log directory: {$directory}");
             }
         }
-    }
-
-    public function getFilesystem(): Filesystem
-    {
-        return $this->filesystem;
     }
 
     public function setIncludeBacktrace(bool $enable): void
@@ -270,7 +233,7 @@ class Logger
             $dir = dirname($this->logFile) . DIRECTORY_SEPARATOR;
             $logFilename = str_replace(['-', ' '], '', $this->logFilename);
             $date = (int) str_replace([' ', '-', '_'], '', $date);
-            $logPath = $dir . $logFilename . "[" . $date . "].log";
+            $logPath = $dir . $logFilename . "_" . $date . ".log";
             if (!is_file($logPath)) throw new MachinjiriException(
                 "Logger: log file " . $this->logFilename . " not found! Specify the name or date correctly" 
             );

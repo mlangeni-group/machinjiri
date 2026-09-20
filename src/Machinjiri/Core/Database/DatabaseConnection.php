@@ -302,10 +302,12 @@ class DatabaseConnection
         if (self::$config === null) {
             throw new MachinjiriException("Database Error: Database configuration not set. Call setConfig() first.", 206);
         }
+
         $driver = self::$config['driver'] ?? null;
         if (!$driver) {
             throw new MachinjiriException("Database Error: Database configuration must specify a 'driver'.", 207);
         }
+        
         return $driver;
     }
 

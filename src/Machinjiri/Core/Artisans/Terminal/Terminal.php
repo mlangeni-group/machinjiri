@@ -11,7 +11,8 @@ use Mlangeni\Machinjiri\Core\Artisans\Terminal\Commands\{
     ViewCommands,
     WebhookCommand,
     Network,
-    DatabaseCommands
+    DatabaseCommands,
+    NotificationCommand
 };
 
 class Terminal extends Application
@@ -24,7 +25,8 @@ class Terminal extends Application
         ViewCommands::class,
         WebhookCommand::class,
         Network::class,
-        DatabaseCommands::class
+        DatabaseCommands::class,
+        NotificationCommand::class,
     ];
 
     public function __construct()

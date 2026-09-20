@@ -22,7 +22,7 @@ class QueueServiceProvider extends ServiceProvider
         });
         
         // Register queue worker
-        $this->singleton('queue.worker', function($app) {
+        $this->singleton(BaseWorker::class, function($app) {
             $queue = $app->resolve('queue');
             $processor = $app->resolve('queue.processor');
             return new BaseWorker($app, $queue, $processor);
@@ -34,10 +34,16 @@ class QueueServiceProvider extends ServiceProvider
         });
         
         // Register job dispatcher
-        $this->singleton('queue.dispatcher', function($app) {
+        $this->singleton(BaseJobDispatcher::class, function($app) {
             $queue = $app->resolve('queue');
             return new BaseJobDispatcher($app, $queue);
         });
+
+        $this->aliasMany([
+            'queue.dispatcher'        => BaseJobDispatcher::class,
+            'queue.worker'            => BaseWorker::class,
+        ]);
+        
     }
 
     /**

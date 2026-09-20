@@ -4,7 +4,7 @@ namespace Mlangeni\Machinjiri\Core\Transport\SMS\Builder;
 
 use Mlangeni\Machinjiri\Core\Transport\SMS\Message;
 
-class MessageBuilder
+class MessageBuilder 
 {
     private Message $message;
 

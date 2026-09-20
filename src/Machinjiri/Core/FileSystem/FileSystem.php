@@ -4,7 +4,7 @@ namespace Mlangeni\Machinjiri\Core\FileSystem;
 
 use Mlangeni\Machinjiri\Core\FileSystem\Contracts\FileSystem as FileSystemContract;
 
-class Filesystem implements FileSystemContract
+class FileSystem implements FileSystemContract
 {
     protected FileSystemContract $adapter;
 

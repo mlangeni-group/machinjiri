@@ -233,6 +233,7 @@ class ProviderLoader
                 \Mlangeni\Machinjiri\Core\Providers\CoreProviders\AppServiceProvider::class,
                 \Mlangeni\Machinjiri\Core\Providers\CoreProviders\DatabaseServiceProvider::class,
                 \Mlangeni\Machinjiri\Core\Providers\CoreProviders\QueueServiceProvider::class,
+                \Mlangeni\Machinjiri\Core\Providers\CoreProviders\NotificationServiceProvider::class,
             ],
             
             /**
