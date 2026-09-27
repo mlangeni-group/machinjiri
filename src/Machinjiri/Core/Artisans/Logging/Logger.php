@@ -28,6 +28,8 @@ class Logger
 
     private string $referrer;
 
+    protected ?string $subdirectory = null;
+
     public function __construct(
         ?string $logFile = null,
         string $minLevel = self::DEBUG,
@@ -36,6 +38,7 @@ class Logger
         ?string $referrer = null
     ) {
         $this->referrer = $referrer ?? 'app';
+        $this->subdirectory = $subdirectory;
         
         $this->path = self::resolveLogPath($isEvent);
 
@@ -88,9 +91,12 @@ class Logger
     {
         $path = self::getLogsRoot();
         $type = $isEvent ? 'events' : 'reports';
-        $path = $path . $this->referrer . DIRECTORY_SEPARATOR . $type . DIRECTORY_SEPARATOR . date('Y-m-d') . DIRECTORY_SEPARATOR;
 
-        if (!is_dir($path)) @mkdir($path);
+        $path .= $this->referrer . DIRECTORY_SEPARATOR . $type . DIRECTORY_SEPARATOR . date('Y-m-d') . DIRECTORY_SEPARATOR;
+
+        if (!is_dir($path)) {
+            @mkdir($path, 0755, true);
+        }
 
         return $path;
     }

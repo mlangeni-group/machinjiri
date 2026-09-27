@@ -26,15 +26,22 @@ class AfricasTalkingTransport extends AbstractTransport implements TransportInte
         ?RateLimiter $rateLimiter = null
     ) {
         parent::__construct($app, $retryPolicy, $circuitBreaker, $idempotencyStore, $rateLimiter);
+        $this->logger = $this->app->resolve(Logger::class);
 
-        if (!class_exists(AfricasTalking::class)) {
-            throw SMSException::transportError("AfricasTalking library not installed. Install via composer with 'composer require africastalking/africastalking'");
+        try {
+            if (!class_exists(AfricasTalking::class)) {
+                SMSException::transportError("AfricasTalking library not installed", 989);
+            }
+            
+            $this->at = new AfricasTalking(
+                $this->getConfig()['username'] ?? '',
+                $this->getConfig()['api_key'] ?? ''
+            );
+
+        } catch (SMSException $smsException) {
+            $this->logger->error($smsException->getMessage(), ['class' => AfricasTalking::class, 'code' => $smsException->getCode()]);
         }
         
-        $this->at = new AfricasTalking(
-            $this->getConfig()['username'] ?? '',
-            $this->getConfig()['api_key'] ?? ''
-        );
     }
 
     public function getName(): string

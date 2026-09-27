@@ -229,6 +229,8 @@ class HttpRequest {
         
         // Apply OAuth headers
         $this->applyOAuthHeaders($mergedHeaders);
+
+        $this->client->withHeaderCapture();
         
         // Convert headers to HttpClient format
         $curlHeaders = [];

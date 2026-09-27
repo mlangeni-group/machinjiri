@@ -17,7 +17,7 @@ use Mlangeni\Machinjiri\Core\Providers\ServiceProvider;
 use Mlangeni\Machinjiri\Core\Http\{HttpRequest, HttpResponse, HttpClient};
 use Mlangeni\Machinjiri\Core\Authentication\{Session, Cookie, AuthManager};
 use Mlangeni\Machinjiri\Core\Artisans\Logging\{Logger, LoggerFactory};
-use Mlangeni\Machinjiri\Core\Artisans\Events\EventListener;
+use Mlangeni\Machinjiri\Core\Artisans\Events\{EventListener, Event};
 use Mlangeni\Machinjiri\Core\Debug\Debugger;
 use Mlangeni\Machinjiri\Core\FileSystem\FileSystemManager;
 use Mlangeni\Machinjiri\Core\FileSystem\Adapters\{LocalAdapter, FtpAdapter};
@@ -141,7 +141,11 @@ class AppServiceProvider extends ServiceProvider
         // EventListener is bound as a regular binding (not singleton) to allow
         // fresh instances with a dedicated logger.
         $this->bind(EventListener::class, function($app) {
-            return new EventListener(new Logger(env('APP_NAME') ?? 'machinjiri', Logger::DEBUG, true, '', 'app'));
+            return new EventListener($app->resolve('app.main.logger'));
+        });
+
+        $this->singleton('app.main.logger', function ($app) {
+            return new Logger(env('APP_NAME') ?? 'machinjiri', Logger::DEBUG, true, '', 'app');
         });
 
         // -------------------- Logging --------------------
@@ -305,6 +309,9 @@ class AppServiceProvider extends ServiceProvider
 
         $wsm = $this->app->resolve(WebhookSubscriptionManager::class);
         $wsm->registerWebhookHandlers();
+
+        Event::boot($this->app->resolve('app.main.logger'));
+
     }
 
     /**
