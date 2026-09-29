@@ -8,46 +8,61 @@ use Mlangeni\Machinjiri\Core\Exceptions\MachinjiriException;
 
 class AssetManager implements AssetManagerInterface
 {
+    /** Bounded mtime cache to avoid unbounded memory growth. */
+    protected const TIMESTAMP_CACHE_LIMIT = 512;
+
     protected static array $assetTimestamps = [];
 
     public function asset(string $path): string
     {
-        if (strpos($path, '..') !== false) {
+        if (strpbrk($path, "\0") !== false || strpos($path, '..') !== false) {
             throw new MachinjiriException("Invalid asset path: {$path}");
         }
 
         $fullPath = ViewConfig::getAssetsPath() . ltrim($path, '/\\');
-        if (!file_exists($fullPath)) {
+        if (!is_file($fullPath)) {
             throw new MachinjiriException("Asset file not found: {$fullPath}");
         }
 
         if (!isset(self::$assetTimestamps[$fullPath])) {
-            self::$assetTimestamps[$fullPath] = filemtime($fullPath);
+            if (count(self::$assetTimestamps) >= self::TIMESTAMP_CACHE_LIMIT) {
+                // Keep the newest half.
+                self::$assetTimestamps = array_slice(
+                    self::$assetTimestamps,
+                    -intdiv(self::TIMESTAMP_CACHE_LIMIT, 2),
+                    null,
+                    true
+                );
+            }
+            clearstatcache(true, $fullPath);
+            self::$assetTimestamps[$fullPath] = filemtime($fullPath) ?: time();
         }
-        $version = self::$assetTimestamps[$fullPath];
 
-        $url = ViewConfig::getAssetsUrl() . ltrim($path, '/\\');
-        $separator = (parse_url($url, PHP_URL_QUERY) ? '&' : '?');
-        return $url . $separator . 'v=' . $version;
+        $url = ViewConfig::getAssetsUrl()
+             . ltrim(str_replace('\\', '/', $path), '/');
+
+        // The URL is always freshly built, so no query string exists yet.
+        return $url . '?v=' . self::$assetTimestamps[$fullPath];
     }
 
     public function style(string $path, array $attributes = []): void
     {
-        $url = $this->asset($path);
+        $url   = $this->asset($path);
         $attrs = $this->buildAttributes($attributes);
-        printf('<link rel="stylesheet" href="%s"%s>', htmlspecialchars($url), $attrs);
+        printf('<link rel="stylesheet" href="%s"%s>', htmlspecialchars($url, ENT_QUOTES), $attrs);
     }
 
     public function script(string $path, array $attributes = []): void
     {
-        $url = $this->asset($path);
+        $url   = $this->asset($path);
         $attrs = $this->buildAttributes($attributes);
-        printf('<script src="%s"%s></script>', htmlspecialchars($url), $attrs);
+        printf('<script src="%s"%s></script>', htmlspecialchars($url, ENT_QUOTES), $attrs);
     }
 
     public function setAssetsPath(string $path): void
     {
         ViewConfig::setAssetsPath($path);
+        $this->flushTimestampCache();
     }
 
     public function setAssetsUrl(string $url): void
@@ -70,13 +85,24 @@ class AssetManager implements AssetManagerInterface
         $attrs = '';
         foreach ($attributes as $key => $value) {
             if (is_int($key)) {
-                $attrs .= ' ' . htmlspecialchars($value);
-            } elseif (is_bool($value) && $value) {
-                $attrs .= ' ' . htmlspecialchars($key);
+                $attrs .= ' ' . htmlspecialchars((string)$value, ENT_QUOTES);
+            } elseif (is_bool($value)) {
+                if ($value) {
+                    $attrs .= ' ' . htmlspecialchars((string)$key, ENT_QUOTES);
+                }
             } else {
-                $attrs .= sprintf(' %s="%s"', htmlspecialchars($key), htmlspecialchars($value));
+                $attrs .= sprintf(
+                    ' %s="%s"',
+                    htmlspecialchars((string)$key, ENT_QUOTES),
+                    htmlspecialchars((string)$value, ENT_QUOTES)
+                );
             }
         }
         return $attrs;
+    }
+
+    public function flushTimestampCache(): void
+    {
+        self::$assetTimestamps = [];
     }
 }

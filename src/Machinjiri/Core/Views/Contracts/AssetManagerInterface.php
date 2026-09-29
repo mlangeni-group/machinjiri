@@ -12,4 +12,5 @@ interface AssetManagerInterface
     public function getAssetsPath(): string;
     public function getAssetsUrl(): string;
     public function buildAttributes(array $attributes): string;
+    public function flushTimestampCache(): void;
 }
