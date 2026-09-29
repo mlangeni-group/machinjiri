@@ -293,29 +293,6 @@ class EventListener
         return false;
     }
 
-    public function displayEvents(): void
-    {
-        $events = $this->getEvents();
-        if (empty($events)) {
-            echo "No events registered.\n";
-            return;
-        }
-
-        echo "Registered Events:\n=================\n";
-        foreach ($events as $event) {
-            $count = count($this->getListeners($event));
-            echo "Event: {$event} ({$count} listener(s))\n";
-            foreach ($this->listeners[$event] as $priority => $entries) {
-                foreach ($entries as $entry) {
-                    $tag = $entry['once'] ? ' (once)' : '';
-                    echo "  - Priority: {$priority}, Listener: "
-                        . self::describeListener($entry['listener']) . $tag . "\n";
-                }
-            }
-            echo "\n";
-        }
-    }
-
     /* ---------------------------------------------------------------------
      |  Internals
      * ------------------------------------------------------------------- */

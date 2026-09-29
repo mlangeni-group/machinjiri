@@ -169,9 +169,6 @@ class HttpClient
 
     public function close(): void
     {
-        if ($this->ch instanceof \CurlHandle || is_resource($this->ch)) {
-            curl_close($this->ch);
-        }
         $this->ch = null;
     }
 

@@ -16,7 +16,7 @@ class QueueServiceProvider extends ServiceProvider
     {
         // Register queue bindings
         $this->bind('queue', function($app) {
-            $config = $app->getConfigurations()['queue'] ?? [];
+            $config = $app->configurat['queue'] ?? [];
             $driver = $config['default'] ?? getenv('QUEUE_DRIVER');
             return $this->createQueueDriver($driver, $config);
         });
@@ -93,7 +93,7 @@ class QueueServiceProvider extends ServiceProvider
      */
     protected function createJobsTableIfNeeded(): void
     {
-        $config = $this->getConfigurations()['queue'] ?? [];
+        $config = $this->app->configurations['queue'] ?? [];
         $driver = $config['default'] ?? 'sync';
         
         if ($driver === 'database') {

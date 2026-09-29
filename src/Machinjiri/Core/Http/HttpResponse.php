@@ -382,4 +382,9 @@ class HttpResponse
         $this->sent       = false;
         return $this;
     }
+
+    public static function getStatusTexts(): array 
+    {
+        return self::STATUS_TEXTS;
+    }
 }
