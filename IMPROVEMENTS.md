@@ -1,111 +1,106 @@
 # Machinjiri Framework Improvements
 
-This document summarizes the major upgrades currently available in Machinjiri 2.2.6.
+This document summarizes the major upgrades delivered in the current Machinjiri framework release, version `2.2.6`.
 
-## Platform and Compatibility
+## Overview
 
-- Updated the framework to support **PHP 8.3+**, with compatibility for PHP 8.4 environments.
-- Standardized release metadata and package versioning around the current 2.2.6 release.
-- Improved the application bootstrap flow for modern PHP runtimes and dependency management.
-- Expanded service-provider registration and container binding behavior for cleaner app wiring.
-- Tightened compatibility around Symfony Console, Filesystem, and Process integrations used by the framework shell and generators.
+Machinjiri continues to evolve as a modular PHP framework aimed at speed, reliability, and developer productivity. The most recent release strengthens the platform across core infrastructure, developer tooling, application lifecycle management, security, and background processing.
 
-## Core Framework Upgrades
+## Platform and Compatibility Upgrades
 
-- Improved dependency injection through the application container and service bindings.
-- Added modular provider-based service registration and bootstrapping.
-- Added environment-aware configuration and `.env` loading for application setup.
-- Expanded Artisan generators and interactive terminal tooling for common app scaffolding.
-- Added Symfony Console, Filesystem, and Process integration for CLI and project automation.
-- Added FTP filesystem adapter support and Redis integration for distributed workflows.
-- Improved request lifecycle stability across routing, middleware resolution, and service registration to make app bootstrapping more predictable.
+- Added support for modern PHP runtimes, including **PHP 8.3+** and PHP 8.4 compatibility
+- Standardized framework metadata and package versioning around the current `2.2.6` release
+- Improved application bootstrap flow and container bootstrapping for better startup consistency
+- Tightened integration with Symfony Console, Filesystem, and Process components for CLI and generator tooling
+- Improved provider registration and service binding behavior for cleaner dependency injection flows
 
-## Routing and HTTP
+## Core Framework Improvements
 
-- Expanded routing support for REST-style requests and AJAX-aware route flows.
-- Improved route groups with shared middleware, prefixes, and CORS handling.
-- Added named routes and URL generation with route parameters.
-- Improved middleware dispatching, rate limiting, and preflight request handling.
-- Added richer HTTP request and response objects, including JSON, redirect, download, and streaming responses.
-- Added built-in server management helpers and an HTTP client for external API calls.
+- Enhanced the application container with more predictable service resolution and lifecycle behavior
+- Expanded modular service-provider management for bootstrapping extensions and framework features
+- Added environment-aware configuration loading and better `.env` integration for app initialization
+- Improved the framework shell and generator commands for quicker project scaffolding and maintenance tasks
+- Refined request lifecycle handling, middleware resolution, and application startup stability
 
-## Views, UI Components, and Developer Experience
+## Routing, HTTP, and Request Handling
 
-- Added template inheritance with layouts and sections.
-- Added partial includes, shared view data, loop directives, and asset management.
-- Added reusable UI components with attribute handling and dynamic CSS class building.
-- Added common components for alerts, buttons, cards, forms, inputs, modals, navigation, and progress bars.
-- Added a component factory for programmatic UI element creation.
-- Improved frontend integration helpers and asset bridging workflows.
+- Improved REST-friendly routing patterns and route lifecycle management
+- Enhanced middleware flow, grouping, prefixes, and CORS handling for API and web applications
+- Added stronger named route handling and parameter-aware URL generation
+- Expanded HTTP request and response capabilities, including JSON, redirects, downloads, and streaming responses
+- Improved rate limiting, request validation, and preflight handling for modern web workloads
+- Added robust HTTP client utilities for external API integration and service communication
 
-## Database and Persistence
+## Database and Persistence Enhancements
 
-- Added support for MySQL, PostgreSQL, and SQLite through a common database layer.
-- Added fluent query builders and database grammars for expressive queries.
-- Added migrations and schema builders for programmatic database management.
-- Added seeders and factories to simplify test and development data setup.
-- Added support for multiple database connections, transaction handling, and connection management.
-- Added database caching and durable queue persistence support.
-- Added Redis-backed queue drivers with delayed jobs, reservation handling, and retries.
+- Improved multi-database support across MySQL, PostgreSQL, and SQLite
+- Expanded fluent query-builder capabilities and grammar support for database-driven applications
+- Strengthened migration and schema workflows for manageable database evolution
+- Improved transaction handling, connection management, and raw query support
+- Added durable queue persistence and better database-backed job workflows
+- Improved Redis-backed queue support with delayed jobs, retries, reservation handling, and worker reliability
 
 ## Authentication, Security, and Forms
 
-- Added session and cookie management with configurable security options.
-- Added OAuth integrations for third-party authentication providers.
-- Added password hashing with bcrypt and Argon2 support.
-- Added CSRF protection for form submissions.
-- Added AES encryption and JWT token support.
-- Added parameterized database queries to reduce SQL injection risk.
-- Added LDAP integration and authentication middleware support.
-- Added a reusable form request and validation layer with rule builders and file-upload handling.
+- Added stronger session and cookie handling with configurable security controls
+- Improved OAuth integration and third-party authentication workflows
+- Expanded password hashing support with modern algorithms and secure defaults
+- Improved CSRF protection and security-oriented form handling
+- Added encryption, JWT support, and secure token utilities for API and user workflows
+- Improved LDAP integration and authentication support for enterprise directory environments
+- Expanded validation and form-request capabilities, including file uploads and rule builders
 
-## Notifications, SMS, and Queues
+## Notifications, SMS, and Webhooks
 
-- Added a notification system with mail, SMS, database, and webhook delivery channels.
-- Added configurable SMS transports with immediate and queued delivery.
-- Added queue-aware dispatch support for asynchronous processing and long-running jobs.
-- Added database-backed job storage and Redis-backed queue support for high-performance workflows.
-- Added queue-related Artisan commands and improved job generation support.
-- Added event listeners for application and queue lifecycle events.
+- Added a more flexible notification system spanning mail, SMS, database, and webhook channels
+- Improved asynchronous delivery and queue-aware processing for long-running outgoing messages
+- Expanded SMS transport configuration, provider abstraction, and structured response handling
+- Added webhook provider subscriptions, signature verification, and idempotency safeguards
+- Improved sync and async webhook routing with better response handling and dispatch control
+- Added better operational support for external service integration and event-driven workflows
 
-## Task Scheduler
+## Queues, Jobs, and Task Scheduling
 
-- Added a persistent task scheduler with repository-backed task storage and execution history.
-- Added cron expression scheduling, queued execution, overlap protection, and retry logic.
-- Added task grouping, prioritization, caching, and health checks.
-- Added task management commands for creating, listing, running, enabling, disabling, and inspecting scheduled work.
+- Improved job queue infrastructure with more reliable persistence and worker behavior
+- Added stronger task scheduler support for cron-based execution, retries, and collision protection
+- Expanded task metadata handling for priority ordering, execution history, and schedule health checks
+- Added queue and scheduler commands for managing jobs and tasks directly from the CLI
+- Improved queue event handling and operational observability for background processing
 
-## Webhooks
+## Views, UI Components, and Developer Experience
 
-- Added provider subscription support and event-aware webhook routing.
-- Added signature verification for HMAC and custom callback checks.
-- Added synchronous or asynchronous processing based on application configuration.
-- Added idempotency protection and structured response handling.
-- Added generated webhook handlers and configuration scaffolding through Artisan workflows.
+- Expanded template inheritance and layout-driven view rendering
+- Improved partial includes, shared view state, and loop directives for cleaner templates
+- Added reusable UI components with dynamic attribute handling and CSS class generation
+- Included common building blocks such as alerts, buttons, cards, forms, modals, navbars, and progress indicators
+- Added a component factory for more programmatic UI assembly and maintainable front-end code
+- Improved asset and frontend-integration helpers for a smoother developer workflow
 
 ## Logging, Errors, and Diagnostics
 
-- Added multi-channel logging for database, file, and event-based output.
-- Added structured log levels from debug through critical.
-- Added environment-aware logging behavior for development and production.
-- Reworked exception handling into distinct context, logging, reporting, rendering, and throttling services.
-- Added debugging and data-dumping utilities for diagnostics.
+- Improved multichannel logging for files, database, and event-based diagnostics
+- Refined structured log levels from debug through critical for operational clarity
+- Reworked exception handling into clearer context capture, reporting, rendering, and throttling responsibilities
+- Added stronger debugging and inspection utilities for runtime analysis
+- Improved development and production error behavior for safer application diagnostics
 
 ## Integrations and Utilities
 
-- Added a cURL-based HTTP client for external API requests.
-- Added mail transport integration through PHPMailer.
-- Added filesystem abstractions and adapters for storage operations.
-- Added UUID validation and dedicated UUID exceptions.
-- Added ULID generation, validation, and parsing support.
-- Added OTP/TOTP generation and verification utilities for secure one-time authentication.
-- Added webhook processing with provider subscription handling, idempotency, and async dispatch.
-- Added unified date and time handling with configurable timezone support.
+- Added robust filesystem support with adapter-based storage operations
+- Extended FTP and Redis support for distributed and storage-oriented application needs
+- Added UUID and ULID generation utilities, including validation and parsing support
+- Added OTP/TOTP helpers for secure one-time authentication workflows
+- Improved date and time handling with timezone-aware utilities and formatting helpers
+- Added network utilities and HTTP integration helpers for external service communication
 
-## Testing and Quality
+## Testing and Quality Improvements
 
-- Added framework testing helpers, assertions, mocks, and a reusable test case.
-- Added database refresh support for isolated tests.
-- Added Faker integration for generated test data.
-- Added ParaTest support for parallel execution.
-- Added PHPStan and PHP_CodeSniffer configuration for static analysis and coding standards.
+- Strengthened framework testing support with reusable assertions, mocks, and test-case patterns
+- Improved database test reset workflows for isolated test execution
+- Added Faker integration for realistic fixture generation
+- Improved support for parallel test execution and modern code-quality tooling
+- Continued to align the framework with clean, maintainable PHP development practices
+
+## Summary
+
+The `2.2.6` release focuses on making Machinjiri more robust, modular, and developer-friendly. The framework now offers a more complete foundation for building secure, scalable web applications with modern PHP practices, strong operational tooling, and production-oriented infrastructure support.

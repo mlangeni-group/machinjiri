@@ -1,20 +1,21 @@
 # Machinjiri PHP Framework
 
-Machinjiri is a **flexible, powerful PHP framework** designed for rapid web development. Built for PHP 8.4+, it provides a modular architecture, elegant routing system, comprehensive database abstraction, authentication and authorization, and robust security features. Designed for speed, scalability, and developer experience, Machinjiri empowers developers to build secure, maintainable applications efficiently.
+Machinjiri is a modular, production-ready PHP framework for building maintainable web applications, APIs, and internal tools with speed and clarity. It combines a resilient service container, expressive routing, database tooling, security helpers, queue processing, task scheduling, and modern developer tooling in a single cohesive platform.
 
 Current stable version: `2.2.6`
 
 ## What’s New in 2.2.6
 
-- Updated the framework release metadata to **2.2.6** and aligned package versioning with the current build
-- Kept the framework fully compatible with **PHP 8.3+**, including modern PHP 8.4 runtime environments
-- Improved app bootstrapping and provider registration with cleaner service binding, container wiring, and dependency resolution
-- Strengthened the task scheduler with persistent task state, cron-based triggers, queue dispatch, retries, overlap protection, priority ordering, and health checks
-- Expanded the webhook subsystem with provider subscriptions, signature verification, async/sync routing, response handling, and idempotency support
-- Added more robust notification delivery across mail, SMS, database, and webhook channels with configurable transport handling
-- Improved LDAP, Redis, FTP, and filesystem integrations for more flexible enterprise and distributed deployments
-- Refined exception, logging, and debugging layers to separate context capture, reporting, rendering, and throttling concerns
-- Updated routing, middleware flow, Artisan generators, and mail integration for more resilient application setup and developer workflows
+- Updated the framework release metadata and package versioning to align with the current `2.2.6` release
+- Confirmed compatibility with **PHP 8.3+**, including modern PHP 8.4 runtime environments
+- Improved application bootstrapping, container bindings, and provider registration for cleaner dependency resolution and startup flow
+- Expanded the Artisan CLI and generator ecosystem for faster scaffolding, task automation, and project setup
+- Strengthened the scheduler with persistent task state, cron triggers, retry logic, overlap protection, priority ordering, and health checks
+- Added richer webhook handling with provider subscriptions, signature verification, async/sync processing, and idempotency safeguards
+- Improved notification delivery across mail, SMS, database, and webhook channels with configurable transport management
+- Extended LDAP, Redis, FTP, and filesystem integrations for robust enterprise and distributed deployments
+- Improved exception handling, logging, and debugging layers to separate diagnostics, rendering, and throttling behavior
+- Refined routing, middleware flow, HTTP utilities, and mail integrations for more reliable application orchestration
 
 ## Table of Contents
 
