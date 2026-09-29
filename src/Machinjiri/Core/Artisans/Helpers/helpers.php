@@ -160,6 +160,34 @@ if (!function_exists('alias')) {
     }
 }
 
+if (!function_exists('app_configurations')) {
+    /**
+     * Get the application configurations from the container
+     *
+     * @param string $key
+     * @return array
+     */
+    function app_configurations(string $key = '')
+    {
+        $container = app();
+        
+        if ($container === null) {
+            throw new MachinjiriException(
+                "Application container not initialized.",
+                30104
+            );
+        }
+        
+        if (property_exists($container, 'configurations')) {
+            $configurations = $container->configurations;
+            if ($key === '') {
+                return $configurations;
+            }
+            return $configurations[$key] ?? [];
+        }
+    }
+}
+
 if (!function_exists('service')) {
     /**
      * Get a service provider instance

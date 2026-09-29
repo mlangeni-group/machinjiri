@@ -80,7 +80,7 @@ class DatabaseServiceProvider extends ServiceProvider
               throw new MachinjiriException("Prefetch file must return an array of callbacks in {$prefetchFile}");
           }
           
-          if (!$this->bound(CacheManager::class)) {
+          if (!$this->app->bound(CacheManager::class)) {
             throw new MachinjiriException('CacheManager not bound – cannot prefetch database queries');
           }
           

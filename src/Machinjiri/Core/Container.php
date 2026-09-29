@@ -11,25 +11,31 @@ use Mlangeni\Machinjiri\Core\Database\DatabaseConnection;
 use Mlangeni\Machinjiri\Core\Exceptions\BindingResolutionException;
 use Mlangeni\Machinjiri\Core\Exceptions\MachinjiriException;
 use Mlangeni\Machinjiri\Core\Http\HttpRequest;
+use Mlangeni\Machinjiri\Core\Providers\ProviderLoader;
+use Throwable;
 
 /**
  * Container
  *
- * Facade over the framework's service container, path registry, and
- * configuration loading. Acts as a shared gateway for:
- *  - Application path discovery
- *  - .env & config file loading
- *  - Dependency injection (delegated to ServiceContainer)
+ * Facade over the framework's service container, path registry and
+ * configuration loader.
+ *
+ *  - Path discovery & .env/config loading
+ *  - Delegated dependency injection (ServiceContainer)
+ *  - Provider registry (view paths, migrations, publishes, commands, middleware)
+ *  - Deferred provider resolution hook
+ *  - Freeze / scoped-instance management for long-running runtimes
  */
-#[\AllowDynamicProperties]
 class Container
 {
     public const LOG_FILENAME = 'machinjiri';
 
-    /** @var string|null Application base path (no trailing separator). */
+    /** Application base path (no trailing separator). */
     public static ?string $appBasePath = null;
 
     private static ?Container $instance = null;
+
+    protected static HttpRequest $httpRequest;
 
     // -----------------------------------------------------------------
     // Paths
@@ -48,15 +54,16 @@ class Container
     public ?string $factories   = null;
 
     // -----------------------------------------------------------------
-    // Public mirrors of the service container's state.
-    //
-    // These are bound *by reference* to the corresponding arrays on
-    // $serviceContainer, so reads/writes on either side stay in sync.
+    // Mirrors of the underlying ServiceContainer state, bound by
+    // reference so reads/writes on either side stay in sync.
     // -----------------------------------------------------------------
     public array $bindings  = [];
     public array $aliases   = [];
     public array $instances = [];
 
+    // -----------------------------------------------------------------
+    // Provider-registry state (populated by ServiceProvider subclasses)
+    // -----------------------------------------------------------------
     public array $configurations     = [];
     public array $viewPaths          = [];
     public array $migrationPaths     = [];
@@ -70,9 +77,18 @@ class Container
     // -----------------------------------------------------------------
     // Internal state
     // -----------------------------------------------------------------
+    /** @var array<string,string> */
     protected array $paths = [];
+
+    /** Backing store for __get/__set of undeclared properties. */
+    protected array $dynamicProps = [];
+
+    /** @var array<string,true> */
+    protected array $scopedBindings = [];
+
     protected bool $appEnvironment;
     protected bool $isArtisan = false;
+    protected bool $frozen = false;
 
     protected ?ProviderLoader $providerLoader = null;
     protected Logger $logger;
@@ -81,10 +97,7 @@ class Container
     protected ServiceContainer $serviceContainer;
     protected ConfigurationLoader $configurationLoader;
 
-    /** Memoised configuration (loaded lazily on first getConfigurations()). */
     protected ?array $configurationCache = null;
-
-    protected static HttpRequest $httpRequest;
 
     /**
      * @param string    $appBasePath    Application base path.
@@ -94,9 +107,8 @@ class Container
     {
         self::$appBasePath = rtrim($appBasePath, DIRECTORY_SEPARATOR);
 
-        // Set up the DI engine first and mirror its arrays into our public
-        // properties. From this point on, reads/writes on either side are
-        // visible to the other.
+        // Wire the DI engine first; mirror its arrays by reference so the
+        // facade and ServiceContainer stay in lock-step.
         $this->serviceContainer = new ServiceContainer();
         $this->serviceContainer->setFacade($this);
         $this->bindings  = &$this->serviceContainer->bindings;
@@ -116,7 +128,7 @@ class Container
 
         $this->initialize();
 
-        // Config loader requires $this->coreConfig, populated by initialize().
+        // Requires $this->coreConfig (populated by initialize()).
         $this->configurationLoader = new ConfigurationLoader($this->coreConfig);
 
         $this->dbConnect();
@@ -151,6 +163,12 @@ class Container
         return self::$instance !== null;
     }
 
+    public static function forgetInstance(): void
+    {
+        self::$instance = null;
+        unset($GLOBALS['__machinjiri_container']);
+    }
+
     // =================================================================
     // Bootstrapping
     // =================================================================
@@ -165,7 +183,7 @@ class Container
     /** @throws MachinjiriException */
     protected function validateBasePath(): void
     {
-        if (! is_dir(self::$appBasePath)) {
+        if (!is_dir(self::$appBasePath)) {
             throw new MachinjiriException('Specify Application Base', 101);
         }
     }
@@ -211,17 +229,65 @@ class Container
             : self::$appBasePath . '/../';
     }
 
-    /**
-     * Flag the container as running under an Artisan (CLI) context.
-     * Affects getRootPath() resolution.
-     */
     public function markAsArtisan(bool $isArtisan = true): void
     {
         $this->isArtisan = $isArtisan;
     }
 
     // =================================================================
-    // Configuration (memoised)
+    // Base-path helpers (used by ProviderLoader for caching)
+    // =================================================================
+
+    /**
+     * Absolute path relative to the application base path.
+     */
+    public function basePath(string $path = ''): string
+    {
+
+        if (function_exists('base_path')) {
+            return base_path($path);
+        }
+
+        $base = self::$appBasePath ?? $this->getRootPath();
+        return $path === ''
+            ? $base
+            : rtrim($base, '/\\') . DIRECTORY_SEPARATOR . ltrim($path, '/\\');
+    }
+
+    /**
+     * Absolute path relative to the config directory.
+     */
+    public function configPath(string $path = ''): string
+    {
+
+        if (function_exists('config_path')) {
+            return config_path($path);
+        }
+
+        $base = $this->config ?? ($this->basePath('config') . DIRECTORY_SEPARATOR);
+        return $path === ''
+            ? rtrim($base, '/\\')
+            : rtrim($base, '/\\') . DIRECTORY_SEPARATOR . ltrim($path, '/\\');
+    }
+
+    public function bootstrapPath(string $path = ''): string
+    {
+        $base = $this->bootstrap ?? ($this->basePath('bootstrap') . DIRECTORY_SEPARATOR);
+        return $path === ''
+            ? rtrim($base, '/\\')
+            : rtrim($base, '/\\') . DIRECTORY_SEPARATOR . ltrim($path, '/\\');
+    }
+
+    public function storagePath(string $path = ''): string
+    {
+        $base = $this->storage ?? ($this->basePath('storage') . DIRECTORY_SEPARATOR);
+        return $path === ''
+            ? rtrim($base, '/\\')
+            : rtrim($base, '/\\') . DIRECTORY_SEPARATOR . ltrim($path, '/\\');
+    }
+
+    // =================================================================
+    // Configuration
     // =================================================================
 
     /**
@@ -238,13 +304,84 @@ class Container
     }
 
     /**
-     * Static, memoised access to parsed .env values.
-     *
-     * @return array<string,mixed>|null
+     * Retrieve a loaded configuration section (dot notation optional).
      */
+    public function config(string $key, mixed $default = null): mixed
+    {
+        // Fast path: top-level section already cached by getConfigurations().
+        if (array_key_exists($key, $this->configurations)) {
+            return $this->configurations[$key];
+        }
+
+        // Lazy-load everything, then retry.
+        $configs = $this->getConfigurations();
+
+        if (array_key_exists($key, $configs)) {
+            return $configs[$key];
+        }
+
+        // Dot notation traversal.
+        if (str_contains($key, '.')) {
+            $value = $configs;
+            foreach (explode('.', $key) as $segment) {
+                if (!is_array($value) || !array_key_exists($segment, $value)) {
+                    return $default;
+                }
+                $value = $value[$segment];
+            }
+            return $value;
+        }
+
+        return $default;
+    }
+
+    /**
+     * Merge a config file into the runtime registry.
+     *
+     * The runtime registry always wins over the file defaults; this makes
+     * merges idempotent and preserves values injected by tests or boot
+     *
+     * @throws MachinjiriException
+     */
+    public function mergeConfigFrom(string $path, string $key, bool $throw = false): void
+    {
+
+        if (!is_file($path)) {
+            if ($throw) {
+                throw new MachinjiriException("Configuration file for {$key} not found in: {$path}", 30104);
+            }
+            return;
+        }
+
+        $fromFile = require $path;
+
+        if (!is_array($fromFile)) {
+            throw new MachinjiriException(
+                "Configuration file for {$key} must return an array: {$path}",
+                30105
+            );
+        }
+
+        $existing = $this->configurations[$key] ?? [];
+
+        // File defaults are merged UNDER existing runtime values.
+        $this->configurations[$key] = array_replace_recursive($fromFile, $existing);
+
+        // Invalidate the memoised bundle so callers see the new values.
+        $this->configurationCache = null;
+    }
+
     public static function dotEnv(): ?array
     {
         return ConfigurationLoader::loadEnv(self::getInstance());
+    }
+
+    public static function resolveDebugMode(string $path): bool
+    {
+        $variables = ConfigurationLoader::loadEnvArray(null, $path);
+        $debug     = $variables['APP_DEBUG'] ?? true;
+
+        return filter_var($debug, FILTER_VALIDATE_BOOLEAN);
     }
 
     // =================================================================
@@ -256,7 +393,7 @@ class Container
     {
         $routes = $this->routes . 'web.php';
 
-        if (! is_file($routes)) {
+        if (!is_file($routes)) {
             throw new MachinjiriException('Routing Error: web.php not found in routes/', 109);
         }
 
@@ -270,7 +407,6 @@ class Container
 
     public static function getRoutingBase(): string
     {
-        // Explicit override via APP_BASE_PATH env variable.
         $envVars = self::dotEnv();
         if ($envVars && isset($envVars['APP_BASE_PATH'])) {
             return rtrim($envVars['APP_BASE_PATH'], '/');
@@ -304,7 +440,8 @@ class Container
 
     public static function getBaseUrl(): string
     {
-        $isHttps  = !empty(self::$httpRequest->getServerParam('HTTPS')) && self::$httpRequest->getServerParam('HTTPS') !== 'off';
+        $isHttps  = !empty(self::$httpRequest->getServerParam('HTTPS'))
+            && self::$httpRequest->getServerParam('HTTPS') !== 'off';
         $protocol = $isHttps ? 'https' : 'http';
         $host     = self::$httpRequest->getServerParam('HTTP_HOST') ?? 'localhost';
 
@@ -325,7 +462,7 @@ class Container
         return $this->storage . 'logs/';
     }
 
-    public function getStoragePath(): string|null
+    public function getStoragePath(): ?string
     {
         return $this->storage;
     }
@@ -356,7 +493,7 @@ class Container
 
     public function isDownForMaintenance(): bool
     {
-        $appConfig = $this->getConfigurations()['app'];
+        $appConfig = $this->getConfigurations()['app'] ?? [];
 
         $value = $appConfig['app_maintenance']
             ?? $appConfig['maintenance']
@@ -367,27 +504,98 @@ class Container
     }
 
     // =================================================================
-    // Dependency injection — delegates to ServiceContainer
+    // Dependency injection — delegated
     // =================================================================
 
     public function bind(string $abstract, $concrete = null, bool $shared = false): void
     {
+        $this->assertNotFrozen('bind', $abstract);
         $this->serviceContainer->bind($abstract, $concrete, $shared);
     }
 
     public function singleton(string $abstract, $concrete = null): void
     {
+        $this->assertNotFrozen('singleton', $abstract);
         $this->serviceContainer->singleton($abstract, $concrete);
+    }
+
+    /**
+     * Scoped binding: a singleton within the current request / worker
+     * cycle. Cleared by forgetScopedInstances().
+     */
+    public function scoped(string $abstract, $concrete = null): void
+    {
+        $this->assertNotFrozen('scoped', $abstract);
+
+        if (method_exists($this->serviceContainer, 'scoped')) {
+            $this->serviceContainer->scoped($abstract, $concrete);
+        } else {
+            // Fall back to a singleton + facade-level tracking.
+            $this->serviceContainer->singleton($abstract, $concrete);
+        }
+
+        $this->scopedBindings[$abstract] = true;
+    }
+
+    public function instance(string $abstract, mixed $instance): void
+    {
+        $this->assertNotFrozen('instance', $abstract);
+
+        if (method_exists($this->serviceContainer, 'instance')) {
+            $this->serviceContainer->instance($abstract, $instance);
+        } else {
+            $this->instances[$abstract] = $instance;
+        }
     }
 
     public function alias(string $abstract, string $alias): void
     {
+        $this->assertNotFrozen('alias', $alias);
         $this->serviceContainer->alias($abstract, $alias);
     }
 
+    /**
+     * Resolve a service.
+     *
+     * Before delegating to the ServiceContainer, gives any deferred
+     * provider a chance to register its bindings.
+     */
     public function make(string $abstract, array $parameters = [])
     {
+        if ($this->providerLoader !== null
+            && !$this->serviceContainer->bound($abstract)
+            && !isset($this->instances[$abstract])
+            && !isset($this->aliases[$abstract])
+        ) {
+            try {
+                $this->providerLoader->loadDeferredProvider($abstract);
+            } catch (Throwable $e) {
+                // Swallow: fall through so ServiceContainer can still try
+                // autowiring; the real error will surface if it fails too.
+                $this->logger->debug(
+                    'Deferred provider lookup failed for {service}: {error}',
+                    ['service' => $abstract, 'error' => $e->getMessage()]
+                );
+            }
+        }
+
         return $this->serviceContainer->make($abstract, $parameters);
+    }
+
+    /**
+     * PSR-11-style accessor.
+     */
+    public function get(string $id): mixed
+    {
+        return $this->make($id);
+    }
+
+    /**
+     * PSR-11-style existence check.
+     */
+    public function has(string $id): bool
+    {
+        return $this->bound($id) || class_exists($id);
     }
 
     /**
@@ -432,9 +640,73 @@ class Container
         $this->middlewareGroups   = [];
         $this->routeBindings      = [];
         $this->routeModelBindings = [];
+        $this->scopedBindings     = [];
+        $this->dynamicProps       = [];
 
         $this->configurationCache = null;
         ConfigurationLoader::clearEnvCache();
+    }
+
+    // =================================================================
+    // Lifecycle: freeze & scoped instances
+    // =================================================================
+
+    /**
+     * Prevent further binding mutations after boot.
+     *
+     * Deferred providers must declare their services via
+     * DeferredProviderInterface and be registered before freeze(), or
+     * they will not be able to bind at resolve time. Call this from the
+     * front controller after ProviderLoader::boot().
+     */
+    public function freeze(): void
+    {
+        $this->frozen = true;
+    }
+
+    public function isFrozen(): bool
+    {
+        return $this->frozen;
+    }
+
+    /**
+     * Drop all scoped instances. Call once per request in long-running
+     * runtimes (RoadRunner / Swoole / FrankenPHP / Octane-style).
+     */
+    public function forgetScopedInstances(): void
+    {
+        foreach (array_keys($this->scopedBindings) as $abstract) {
+            unset($this->instances[$abstract]);
+        }
+
+        if (method_exists($this->serviceContainer, 'forgetScopedInstances')) {
+            $this->serviceContainer->forgetScopedInstances();
+        }
+    }
+
+    protected function assertNotFrozen(string $op, string $abstract): void
+    {
+        if (!$this->frozen) {
+            return;
+        }
+
+        // Deferred providers legitimately bind at resolve time; allow
+        // bindings from a currently-registering provider. External code
+        // hits the hard stop.
+        if ($this->providerLoader !== null) {
+            $current = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 6);
+            foreach ($current as $frame) {
+                $class = $frame['class'] ?? '';
+                if (str_starts_with($class, __NAMESPACE__ . '\\Providers')) {
+                    return;
+                }
+            }
+        }
+
+        throw new MachinjiriException(
+            "Container is frozen; cannot {$op} '{$abstract}'.",
+            30120
+        );
     }
 
     // =================================================================
@@ -464,7 +736,7 @@ class Container
             'unitTesting' => $this->unitTesting = $normalized,
             'seeders'     => $this->seeders     = $normalized,
             'factories'   => $this->factories   = $normalized,
-            default       => null, // unknown key — still added to $paths above
+            default       => null,
         };
     }
 
@@ -475,7 +747,97 @@ class Container
     }
 
     // =================================================================
-    // Middleware / Route model bindings
+    // Provider-registry helpers (called by ServiceProvider subclasses)
+    // =================================================================
+
+    public function addViewPath(string $path, ?string $namespace = null): void
+    {
+        if ($namespace !== null) {
+            $this->viewPaths[$namespace] = $path;
+        } else {
+            if (!in_array($path, $this->viewPaths, true)) {
+                $this->viewPaths[] = $path;
+            }
+        }
+    }
+
+    /** @return array<int|string,string> */
+    public function getViewPaths(): array
+    {
+        return $this->viewPaths;
+    }
+
+    public function addMigrationPath(string $path): void
+    {
+        if (!in_array($path, $this->migrationPaths, true)) {
+            $this->migrationPaths[] = $path;
+        }
+    }
+
+    /** @return list<string> */
+    public function getMigrationPaths(): array
+    {
+        return $this->migrationPaths;
+    }
+
+    /**
+     * @param array<string,string> $assets
+     */
+    public function addPublishGroup(string $group, array $assets): void
+    {
+        $this->publishes[$group] = array_merge(
+            $this->publishes[$group] ?? [],
+            $assets
+        );
+    }
+
+    /** @return array<string,array<string,string>> */
+    public function getPublishes(): array
+    {
+        return $this->publishes;
+    }
+
+    public function addCommands(array $commands): void
+    {
+        foreach ($commands as $command) {
+            if (!in_array($command, $this->commands, true)) {
+                $this->commands[] = $command;
+            }
+        }
+    }
+
+    /** @return list<string> */
+    public function getCommands(): array
+    {
+        return $this->commands;
+    }
+
+    public function addMiddleware(string|array $middleware, ?string $name = null): void
+    {
+        if (is_array($middleware)) {
+            foreach ($middleware as $key => $value) {
+                is_int($key)
+                    ? $this->middleware[] = $value
+                    : $this->middleware[$key] = $value;
+            }
+            return;
+        }
+
+        if ($name !== null) {
+            $this->middleware[$name] = $middleware;
+        } else {
+            $this->middleware[] = $middleware;
+        }
+    }
+
+    /** @return array<int|string,string> */
+    public function getMiddleware(): array
+    {
+        return $this->middleware;
+    }
+
+    // =================================================================
+    // Middleware groups / Route model bindings
     // =================================================================
 
     public function middlewareGroup(string $name, array $middleware): void
@@ -515,6 +877,11 @@ class Container
         $this->providerLoader = $loader;
     }
 
+    public function getProviderLoader(): ?ProviderLoader
+    {
+        return $this->providerLoader;
+    }
+
     // =================================================================
     // Magic methods
     // =================================================================
@@ -529,8 +896,12 @@ class Container
             return $this->paths[$name];
         }
 
-        if (isset($this->configurations[$name])) {
+        if (array_key_exists($name, $this->configurations)) {
             return $this->configurations[$name];
+        }
+
+        if (array_key_exists($name, $this->dynamicProps)) {
+            return $this->dynamicProps[$name];
         }
 
         throw new MachinjiriException("Property {$name} not found on container.", 111);
@@ -541,23 +912,31 @@ class Container
     {
         if (str_starts_with($name, 'config.')) {
             $this->configurations[substr($name, 7)] = $value;
+            $this->configurationCache = null;
             return;
         }
 
         if (str_starts_with($name, 'path.')) {
-            $this->setPath(substr($name, 5), $value);
+            $this->setPath(substr($name, 5), (string) $value);
             return;
         }
 
-        $this->{$name} = $value;
+        // No dynamic properties — store in the internal bag.
+        $this->dynamicProps[$name] = $value;
     }
 
     public function __isset(string $name): bool
     {
         return $this->bound($name)
             || isset($this->paths[$name])
-            || isset($this->configurations[$name])
+            || array_key_exists($name, $this->configurations)
+            || array_key_exists($name, $this->dynamicProps)
             || property_exists($this, $name);
+    }
+
+    public function __unset(string $name): void
+    {
+        unset($this->dynamicProps[$name]);
     }
 
     public function __call(string $method, array $parameters)
@@ -609,18 +988,24 @@ class Container
         return LoggerFactory::system($logFile, 'framework', $event);
     }
 
+    /**
+     * Instantiate the provider loader, keep a reference for deferred
+     * lookups, and run the register + boot cycle.
+     */
     private function loadServiceContainer(): void
     {
         $loader = new ProviderLoader($this);
+        $this->providerLoader = $loader;
+
+        // The loader's constructor already binds itself via instance();
+        if (!$this->bound(ProviderLoader::class)) {
+            $this->instance(ProviderLoader::class, $loader);
+        }
+        if (!$this->bound('providers')) {
+            $this->instance('providers', $loader);
+        }
+
         $loader->register();
         $loader->boot();
-    }
-
-    public static function resolveDebugMode(string $path): bool
-    {
-        $variables = ConfigurationLoader::loadEnvArray(null, $path);
-        $debug     = $variables['APP_DEBUG'] ?? true;
-
-        return filter_var($debug, FILTER_VALIDATE_BOOLEAN);
     }
 }

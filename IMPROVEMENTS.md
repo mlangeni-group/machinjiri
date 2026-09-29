@@ -1,13 +1,14 @@
 # Machinjiri Framework Improvements
 
-This document summarizes the major upgrades currently available in Machinjiri 2.2.5.
+This document summarizes the major upgrades currently available in Machinjiri 2.2.6.
 
 ## Platform and Compatibility
 
 - Updated the framework to support **PHP 8.3+**, with compatibility for PHP 8.4 environments.
-- Standardized release metadata and package versioning around the current 2.2.5 release.
+- Standardized release metadata and package versioning around the current 2.2.6 release.
 - Improved the application bootstrap flow for modern PHP runtimes and dependency management.
 - Expanded service-provider registration and container binding behavior for cleaner app wiring.
+- Tightened compatibility around Symfony Console, Filesystem, and Process integrations used by the framework shell and generators.
 
 ## Core Framework Upgrades
 
@@ -17,6 +18,7 @@ This document summarizes the major upgrades currently available in Machinjiri 2.
 - Expanded Artisan generators and interactive terminal tooling for common app scaffolding.
 - Added Symfony Console, Filesystem, and Process integration for CLI and project automation.
 - Added FTP filesystem adapter support and Redis integration for distributed workflows.
+- Improved request lifecycle stability across routing, middleware resolution, and service registration to make app bootstrapping more predictable.
 
 ## Routing and HTTP
 
