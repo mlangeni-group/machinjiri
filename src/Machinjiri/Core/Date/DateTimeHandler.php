@@ -1,18 +1,22 @@
 <?php
 
 namespace Mlangeni\Machinjiri\Core\Date;
+
 use \DateTimeZone;
 use \DateTime;
 use \DateInterval;
+use Mlangeni\Machinjiri\Core\Exceptions\DateTimeException;
+
 class DateTimeHandler {
-    private $dateTime;
+
+    private DateTime $dateTime;
 
     public function __construct(string $dateString = 'now', string $timezone = 'UTC') {
         try {
             $timezoneObj = new DateTimeZone($timezone);
             $this->dateTime = new DateTime($dateString, $timezoneObj);
-        } catch (Exception $e) {
-            throw new InvalidArgumentException("Invalid date/time or timezone: " . $e->getMessage());
+        } catch (\Throwable $e) {
+            throw new DateTimeException("Invalid date/time or timezone: " . $e->getMessage());
         }
     }
 

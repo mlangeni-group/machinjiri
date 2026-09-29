@@ -2,18 +2,19 @@
 
 Machinjiri is a **flexible, powerful PHP framework** designed for rapid web development. Built for PHP 8.4+, it provides a modular architecture, elegant routing system, comprehensive database abstraction, authentication and authorization, and robust security features. Designed for speed, scalability, and developer experience, Machinjiri empowers developers to build secure, maintainable applications efficiently.
 
-Current stable version: `2.2.5`
+Current stable version: `2.2.6`
 
-## What’s New in 2.2.5
+## What’s New in 2.2.6
 
-- Upgraded the framework to **PHP 8.3+** support, with compatibility for modern PHP 8.4 runtimes
-- Added a persistent task scheduler with cron expressions, queued execution, overlap locks, task groups, priorities, retries, caching, and health checks
-- Added scheduler Artisan commands for creating, listing, running, enabling, disabling, and inspecting scheduled tasks
-- Improved webhook processing with provider subscriptions, configurable synchronous or asynchronous handling, signature verification, response handling, and idempotency support
-- Added configurable SMS transports with synchronous delivery and queue-backed asynchronous delivery
-- Expanded the notification layer with mail, SMS, database, and webhook channels
-- Reworked exception handling into separate context, logging, reporting, rendering, and throttling services
-- Updated core routing, middleware resolution, service-provider loading, generators, and mail integration for more reliable app bootstrapping
+- Updated the framework release metadata to **2.2.6** and aligned package versioning with the current build
+- Kept the framework fully compatible with **PHP 8.3+**, including modern PHP 8.4 runtime environments
+- Improved app bootstrapping and provider registration with cleaner service binding, container wiring, and dependency resolution
+- Strengthened the task scheduler with persistent task state, cron-based triggers, queue dispatch, retries, overlap protection, priority ordering, and health checks
+- Expanded the webhook subsystem with provider subscriptions, signature verification, async/sync routing, response handling, and idempotency support
+- Added more robust notification delivery across mail, SMS, database, and webhook channels with configurable transport handling
+- Improved LDAP, Redis, FTP, and filesystem integrations for more flexible enterprise and distributed deployments
+- Refined exception, logging, and debugging layers to separate context capture, reporting, rendering, and throttling concerns
+- Updated routing, middleware flow, Artisan generators, and mail integration for more resilient application setup and developer workflows
 
 ## Table of Contents
 
