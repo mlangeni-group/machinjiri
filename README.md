@@ -6,16 +6,23 @@ Current stable version: `2.2.6`
 
 ## What’s New in 2.2.6
 
-- Updated the framework release metadata and package versioning to align with the current `2.2.6` release
+Machinjiri `2.2.6` focuses on production-readiness, cleaner application startup, and broader infrastructure support. The release strengthens the framework across the core container, CLI tooling, queue system, task scheduler, authentication integrations, and event-driven services.
+
+Highlights from this release include:
+
+- Updated the framework metadata and package versioning so the project is aligned with the current `2.2.6` release
 - Confirmed compatibility with **PHP 8.3+**, including modern PHP 8.4 runtime environments
-- Improved application bootstrapping, container bindings, and provider registration for cleaner dependency resolution and startup flow
-- Expanded the Artisan CLI and generator ecosystem for faster scaffolding, task automation, and project setup
-- Strengthened the scheduler with persistent task state, cron triggers, retry logic, overlap protection, priority ordering, and health checks
-- Added richer webhook handling with provider subscriptions, signature verification, async/sync processing, and idempotency safeguards
-- Improved notification delivery across mail, SMS, database, and webhook channels with configurable transport management
-- Extended LDAP, Redis, FTP, and filesystem integrations for robust enterprise and distributed deployments
-- Improved exception handling, logging, and debugging layers to separate diagnostics, rendering, and throttling behavior
-- Refined routing, middleware flow, HTTP utilities, and mail integrations for more reliable application orchestration
+- Improved application bootstrapping, container binding, and service provider registration for more predictable dependency resolution and startup flow
+- Expanded the Artisan CLI and code-generation ecosystem for faster scaffolding, job creation, scheduler administration, and project maintenance
+- Strengthened task scheduling with persisted task state, cron triggers, retries, concurrency protection, priority ordering, and health checks
+- Improved the queue and worker pipeline for more reliable background processing, delayed jobs, and operational control
+- Added richer webhook management with provider subscriptions, signature verification, queued/sync delivery, and idempotency safeguards
+- Extended notification delivery across mail, SMS, database, and webhook channels with configurable transport and dispatch control
+- Improved enterprise integrations for LDAP, Redis, FTP, and filesystem/cloud adapters for distributed deployments
+- Refined request lifecycle management, middleware flow, HTTP utilities, and response handling for more robust web and API orchestration
+- Improved exception handling, logging, profiling, and debugging layers to separate diagnostics, rendering, and rate-limited reporting
+
+This release keeps Machinjiri focused on maintainability, modularity, and developer productivity without sacrificing operational safety or enterprise integration depth.
 
 ## Table of Contents
 
