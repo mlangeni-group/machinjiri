@@ -358,6 +358,7 @@ final class ProviderLoader
             ],
             'deferred' => [
                 \Mlangeni\Machinjiri\Core\Providers\CoreProviders\NotificationServiceProvider::class,
+                \Mlangeni\Machinjiri\Core\Providers\CoreProviders\PerformanceServiceProvider::class,
             ],
         ];
     }

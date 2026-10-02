@@ -8,6 +8,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Style\SymfonyStyle;
+use Symfony\Component\Console\Helper\Table;
 use Mlangeni\Machinjiri\Core\Artisans\Generators\ResourceGenerator;
 use Mlangeni\Machinjiri\Core\Exceptions\MachinjiriException;
 use Mlangeni\Machinjiri\Core\Database\Seeder\SeederManager;
@@ -508,6 +509,47 @@ class DatabaseCommands extends Command
                             $ss->error("Unable to create Factory at the moment");
                             return Command::FAILURE;
                         }
+                    });
+                }
+            },
+
+            new class extends Command {
+                use CommandHelper, MigrationInstances;
+
+                public function __construct()
+                {
+                    parent::__construct('db:factory:run');
+                    $this->setDescription("Generate fake values and insert into database");
+                }
+
+                protected function configure(): void
+                {
+                    $this->addArgument('model', InputArgument::REQUIRED, 'Factory model name');
+                    $this->addOption('count', 'c', InputOption::VALUE_OPTIONAL, 'Number of records to generate', 10);
+                    $this->addOption('fake-only', null, InputOption::VALUE_NONE, 'Generate but do not insert in database');
+                }
+
+                protected function execute(InputInterface $input, OutputInterface $output): int
+                {
+                    return $this->executeWithStyle($input, $output, 'Database Factory', function (SymfonyStyle $ss) use ($input, $output) {
+                        $model = $input->getArgument('model');
+                        $recordCount = $input->getOption('count');
+                        $fakeOnly = (bool) $input->getOption('fake-only');
+
+                        $factoryManager = $this->factory();
+
+                        $records = ($fakeOnly) ? $factoryManager->fake($model, $recordCount) : $factoryManager->run($model, $recordCount);
+
+                        if (count($records) === 0) {
+                            $ss->text("Factory faked no records");
+                            return Command::SUCCESS;
+                        }
+
+                        $records = $records['records'] ?? $records;
+
+                        $count = count($records);
+                        $ss->success("$count} records were generated.");
+                        return Command::SUCCESS;
                     });
                 }
             },

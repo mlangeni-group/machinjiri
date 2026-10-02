@@ -6,6 +6,7 @@ use Mlangeni\Machinjiri\Core\Providers\ServiceProvider;
 use Mlangeni\Machinjiri\Core\Exceptions\MachinjiriException;
 use Mlangeni\Machinjiri\Core\Artisans\Contracts\{QueueInterface, BaseWorker, BaseJobDispatcher};
 use Mlangeni\Machinjiri\Core\Artisans\Contracts\Drivers\{DatabaseQueue, FileQueue, MemoryQueue, RedisQueue, SyncQueue};
+use Mlangeni\Machinjiri\Core\Database\Builders\QueryBuilder;
 
 class QueueServiceProvider extends ServiceProvider
 {
@@ -54,9 +55,6 @@ class QueueServiceProvider extends ServiceProvider
         // Load queue configuration
         $this->mergeConfigFrom($this->app->coreConfig . 'queue.php', 'queue');
         
-        // Create jobs table if using database driver
-        $this->createJobsTableIfNeeded();
-        
     }
 
     /**
@@ -88,29 +86,4 @@ class QueueServiceProvider extends ServiceProvider
         }
     }
 
-    /**
-     * Create jobs table if needed
-     */
-    protected function createJobsTableIfNeeded(): void
-    {
-        $config = $this->app->configurations['queue'] ?? [];
-        $driver = $config['default'] ?? 'sync';
-        
-        if ($driver === 'database') {
-            $table = $config['drivers']['database']['table'] ?? 'jobs';
-            
-            $query = new \Mlangeni\Machinjiri\Core\Database\QueryBuilder('');
-            $sql = $query->createTable($table, [
-                'id' => $query->id()->primary()->autoincrement(),
-                'queue' => $query->string('queue', 255)->notNull(),
-                'payload' => $query->text('payload'),
-                'attempts' => $query->integer('attempts')->default(0),
-                'reserved_at' => $query->integer('reserved_at')->default(0),
-                'available_at' => $query->integer('available_at')->notNull(),
-                'created_at' => $query->integer('created_at')->notNull(),
-            ], ['if_not_exists' => true])->compileCreateTable();
-            
-            \Mlangeni\Machinjiri\Core\Database\DatabaseConnection::executeQuery($sql);
-        }
-    }
-}
+} 
