@@ -3,7 +3,7 @@
 namespace Mlangeni\Machinjiri\Core\Routing;
 
 use Mlangeni\Machinjiri\Core\Container;
-use Mlangeni\Machinjiri\Core\Exceptions\MachinjiriException;
+use Mlangeni\Machinjiri\Core\Exceptions\{MachinjiriException, ViewEngineException};
 use Mlangeni\Machinjiri\Core\Http\HttpRequest;
 use Mlangeni\Machinjiri\Core\Http\HttpResponse;
 use Mlangeni\Machinjiri\Core\Views\View;
@@ -334,7 +334,7 @@ class Router
 
         // Method spoofing
         if ($this->httpRequest->getMethod() === 'POST' && $method = $this->httpRequest->getPostParam('_method')) {
-            // $this->httpRequest->setMethod(strtoupper($method));
+            $this->httpRequest->setMethod(strtoupper($method));
         }
 
         // CORS preflight
@@ -421,13 +421,12 @@ class Router
         $body = '';
         try {
             // The error template should be located in $this->config->errorsDir . "/$code.php"
-            // It can optionally extend a layout using View::extend()
             $view = View::make("errors.{$code}", array_merge($context, [
                 'request' => $this->httpRequest,
                 'response' => $this->httpResponse
             ]));
             $body = $view->render();
-        } catch (\Exception $e) {
+        } catch (ViewEngineException $e) {
             // Fallback if view not found
             $message = $context['message'] ?? 'An error occurred';
             $description = $context['description'] ?? 'An internal error has occurred';
@@ -435,7 +434,7 @@ class Router
         }
 
         $this->httpResponse->setStatusCode($code)->setBody($body)->send();
-        
+        return;
     }
 
     protected function handleHandlerResult(mixed $result): void
@@ -452,24 +451,18 @@ class Router
 
         if (is_string($result)) {
             $this->httpResponse->setBody($result);
-        } elseif ($result === null) {
-            $this->httpResponse->setStatusCode(204);
-            $this->httpResponse->setBody(
-                $this->buitInErrorPage(204, "No Content", "There was no content returned from your request")
-            );
-        } else {
-            throw new MachinjiriException(
-                'Returning an array or object in a traditional (non‑AJAX) route is not allowed. ' .
-                'Use $this->httpResponse->setJsonBody() or mark the route as AJAX.'
-            );
+            $this->httpResponse->send();
+            return;
         }
 
-        if (!$this->httpResponse->isSent()) {
+        if ($result === null || is_object($result)) {
+            $this->httpResponse->setStatusCode(204);
+            $this->httpResponse->setBody($this->buitInErrorPage(204, "No Content", "There was no content returned from your request"));
             $this->httpResponse->send();
         }
+
     }
 
-    // Helper methods (unchanged from original where appropriate)
     protected function autoDetectBasePath(): string
     {
         $containerBase = Container::getRoutingBase();

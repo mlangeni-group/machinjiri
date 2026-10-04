@@ -2,7 +2,7 @@
 
 namespace Mlangeni\Machinjiri\Core\Views;
 
-use Mlangeni\Machinjiri\Core\Exceptions\MachinjiriException;
+use Mlangeni\Machinjiri\Core\Exceptions\ViewEngineException;
 use Mlangeni\Machinjiri\Core\Views\Config\ViewConfig;
 use Mlangeni\Machinjiri\Core\Views\Services\AssetManager;
 use Mlangeni\Machinjiri\Core\Views\Services\ViewCompiler;
@@ -175,7 +175,7 @@ class View
     public function render(): string
     {
         if ($this->renderDepth >= self::MAX_RENDER_DEPTH) {
-            throw new MachinjiriException("Max render depth exceeded for view: {$this->view}");
+            throw new ViewEngineException("Max render depth exceeded for view: {$this->view}");
         }
         $this->renderDepth++;
 
@@ -234,7 +234,7 @@ class View
     {
         try {
             print $this->render();
-        } catch (MachinjiriException $e) {
+        } catch (ViewEngineException $e) {
             $e->show();
         } catch (\Throwable $e) {
             // Never leak raw errors in production; log and show generic.
@@ -295,7 +295,7 @@ class View
     {
         $layout = trim($layout, '\'"');
         if ($layout === '' || strpos($layout, '..') !== false) {
-            throw new MachinjiriException("Invalid layout name: {$layout}");
+            throw new ViewEngineException("Invalid layout name: {$layout}");
         }
         $this->layout = $layout;
     }
@@ -304,7 +304,7 @@ class View
     {
         $name = end($this->sectionStack) ?: null;
         if ($name === null) {
-            throw new MachinjiriException('@parent must be used inside a section');
+            throw new ViewEngineException('@parent must be used inside a section');
         }
         echo $this->parentSections[$name] ?? '';
     }
@@ -424,7 +424,7 @@ class View
     protected static function getCurrentInstance(): self
     {
         if (empty(self::$instanceStack)) {
-            throw new MachinjiriException('No active view instance');
+            throw new ViewEngineException('No active view instance');
         }
         return end(self::$instanceStack);
     }

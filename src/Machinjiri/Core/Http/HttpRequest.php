@@ -826,4 +826,9 @@ class HttpRequest
     {
         return !empty($this->input($key));
     }
+
+    public function setMethod(string $method): void 
+    {
+        $this->method = $method;
+    }
 }
