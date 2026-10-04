@@ -402,7 +402,8 @@ class Container
 
     public static function getSystemTempDir(): string
     {
-        return sys_get_temp_dir();
+        $tmpDir = sys_get_temp_dir();
+        return rtrim($tmpDir, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
     }
 
     public static function getRoutingBase(): string

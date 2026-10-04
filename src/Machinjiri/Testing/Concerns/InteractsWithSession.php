@@ -21,7 +21,7 @@ trait InteractsWithSession
         }
     }
 
-    protected function assertSessionHas(string $key, $value = null): void
+    protected function assertSessionHas(string $key, mixed $value = null): void
     {
         $this->assertArrayHasKey($key, $_SESSION);
         if ($value !== null) {

@@ -42,7 +42,7 @@ trait InteractsWithMail
     /**
      * Assert that a mail was sent.
      */
-    protected function assertMailSent(callable $callback = null): void
+    protected function assertMailSent(?callable $callback = null): void
     {
         $messages = $GLOBALS['__mail_fake_messages'] ?? [];
         $this->assertNotEmpty($messages, 'No mail was sent.');

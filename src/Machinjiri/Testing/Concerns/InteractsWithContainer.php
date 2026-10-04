@@ -11,7 +11,7 @@ trait InteractsWithContainer
         Container::getInstance()->bind($abstract, $concrete, $shared);
     }
 
-    protected function singleton(string $abstract, $concrete = null): void
+    protected function singleton(string $abstract, mixed $concrete = null): void
     {
         Container::getInstance()->singleton($abstract, $concrete);
     }

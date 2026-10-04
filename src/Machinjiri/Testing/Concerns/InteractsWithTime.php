@@ -9,7 +9,7 @@ trait InteractsWithTime
     /**
      * Freeze time at a specific timestamp.
      */
-    protected function freezeTime(int $timestamp = null): void
+    protected function freezeTime(?int $timestamp = null): void
     {
         $this->frozenTime = $timestamp ?? time();
         // Override time() function if not already overridden (requires uopz or similar)

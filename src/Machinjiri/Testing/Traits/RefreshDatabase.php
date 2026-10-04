@@ -8,7 +8,12 @@ trait RefreshDatabase
 {
     protected function setUpDatabase(): void
     {
-        parent::setUpDatabase();
+        DatabaseConnection::setConfig([
+            'driver' => 'sqlite',
+            'database' => ':memory:',
+        ]);
+
+        DatabaseConnection::getInstance();
         $this->beginDatabaseTransaction();
     }
 
@@ -22,7 +27,6 @@ trait RefreshDatabase
 
     protected function beforeApplicationDestroyed(callable $callback): void
     {
-        // Register shutdown function
         register_shutdown_function($callback);
     }
 }

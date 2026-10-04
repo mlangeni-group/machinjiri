@@ -1305,42 +1305,72 @@ php artisan view:cache               # Cache views
 
 ## Testing
 
-Run tests with PHPUnit:
+Machinjiri ships with an upgraded PHPUnit base test case that mirrors the framework’s newer feature set and makes application-level testing easier without forcing a full app scaffold into every repo.
+
+### Base test case
+
+```php
+<?php
+
+namespace Mlangeni\Machinjiri\Tests\Unit;
+
+use Mlangeni\Machinjiri\Testing\TestCase;
+
+class ExampleTest extends TestCase
+{
+    public function testAuthenticatedUserFlow(): void
+    {
+        $user = new class {
+            public string $email = 'tester@example.com';
+            public string $name = 'Tester';
+        };
+
+        $this->actingAs($user);
+        $this->assertAuthenticated();
+
+        $this->withSession([
+            'flash' => 'Welcome back!',
+        ]);
+
+        $this->assertSessionHas('flash', 'Welcome back!');
+    }
+}
+```
+
+### Available test concerns
+
+The upgraded suite exposes helpers for:
+
+- application bootstrapping and app access
+- HTTP request dispatching and response assertions
+- database assertions with SQLite in-memory testing
+- session manipulation and assertions
+- authentication helpers such as `actingAs()`, `be()`, `assertAuthenticated()` and `assertGuest()`
+- console command execution via `artisan()`
+- email, queue and event fakes
+- factory creation and mocking helpers
+- time freezing and faker-based data generation
+- snapshot assertions
+
+### Running the suite
 
 ```bash
 # Run all tests
 composer test
 
-# Run specific test
-vendor/bin/phpunit tests/Unit/UserTest.php
+# Run a single test file
+vendor/bin/phpunit tests/Unit/ExampleTest.php
 
 # Run with coverage
 vendor/bin/phpunit --coverage-html coverage
 ```
 
-**Example Test:**
+### Best practices
 
-```php
-// tests/Unit/UserTest.php
-namespace Mlangeni\Machinjiri\Tests\Unit;
-
-use PHPUnit\Framework\TestCase;
-
-class UserTest extends TestCase
-{
-    public function testUserCreation()
-    {
-        $user = User::create([
-            'name' => 'John',
-            'email' => 'john@example.com',
-            'password' => password_hash('secret', PASSWORD_BCRYPT),
-        ]);
-        
-        $this->assertIsNotNull($user->id);
-        $this->assertEquals('John', $user->name);
-    }
-}
-```
+- use `RefreshDatabase` when you want a fresh SQLite transaction per test
+- use `withoutMiddleware()` when you need to bypass framework middleware in a request test
+- use `artisan()` for command-level validation in console-driven features
+- prefer the built-in fake helpers for mail, queue and events instead of hitting real infrastructure
 
 ## Contributing
 

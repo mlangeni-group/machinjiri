@@ -9,18 +9,18 @@ trait InteractsWithDatabase
 {
     protected function setUpDatabase(): void
     {
-        // Use in-memory SQLite by default for tests
+        // Use in-memory SQLite by default for tests.
         DatabaseConnection::setConfig([
             'driver' => 'sqlite',
             'database' => ':memory:',
         ]);
-        DatabaseConnection::connect();
+
+        DatabaseConnection::getInstance();
     }
 
     protected function tearDownDatabase(): void
     {
-        // Close connection
-        DatabaseConnection::disconnect();
+        DatabaseConnection::shutdown();
     }
 
     protected function assertDatabaseHas(string $table, array $conditions): void

@@ -104,14 +104,14 @@ class Logger
     protected static function getLogsRoot(): string
     {
         if (Container::instancePresent()) {
-            return Container::getInstance()->storage . '/logs/';
+            return rtrim(Container::getInstance()->storage, DIRECTORY_SEPARATOR) . '/logs/';
         }
 
         if (function_exists('storage_path')) {
-            return storage_path('logs/');
+            return rtrim(storage_path('logs/'), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
         }
 
-        return Container::getSystemTempDir() . 'logs/';
+        return rtrim(Container::getSystemTempDir(), DIRECTORY_SEPARATOR) . '/logs/';
     }
 
     protected function shouldLog(string $level): bool

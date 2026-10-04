@@ -4,17 +4,17 @@ namespace Mlangeni\Machinjiri\Testing\Concerns;
 
 trait InteractsWithException
 {
-    protected function expectException(string $exceptionClass): void
+    protected function expectExceptionType(string $exceptionClass): void
     {
         $this->expectException($exceptionClass);
     }
 
-    protected function expectExceptionMessage(string $message): void
+    protected function expectExceptionMessageText(string $message): void
     {
         $this->expectExceptionMessage($message);
     }
 
-    protected function expectExceptionCode(int $code): void
+    protected function expectExceptionCodeValue(int $code): void
     {
         $this->expectExceptionCode($code);
     }
