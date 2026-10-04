@@ -7,7 +7,7 @@ trait InteractsWithMocks
     /**
      * Create a mock of a class using Mockery.
      */
-    protected function mock(string $class, callable $expectations = null)
+    protected function mock(string $class, ?callable $expectations = null)
     {
         $mock = \Mockery::mock($class);
         if ($expectations) {

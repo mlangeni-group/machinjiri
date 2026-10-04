@@ -19,6 +19,9 @@ use Mlangeni\Machinjiri\Core\Http\HttpRequest;
 use Mlangeni\Machinjiri\Core\Http\HttpResponse;
 use Mlangeni\Machinjiri\Core\Authentication\Session;
 use Mlangeni\Machinjiri\Core\Authentication\Cookie;
+use Mlangeni\Machinjiri\Core\Database\Builders\QueryBuilder;
+use Mlangeni\Machinjiri\Core\Database\Caching\CachedQueryBuilder;
+use Mlangeni\Machinjiri\Core\Artisans\Caching\CacheManager;
 
 if (!function_exists('app')) {
     /**
@@ -457,6 +460,28 @@ if (!function_exists('storage_path')) {
         $path = ltrim($path, DIRECTORY_SEPARATOR);
         
         return $storageDir . DIRECTORY_SEPARATOR . $path;
+    }
+}
+
+if (!function_exists('database_path')) {
+    /**
+     * Get the full path to the database directory or a subdirectory
+     *
+     * @param string $path Subdirectory or file path within database
+     * @return string Full path
+     */
+    function database_path(string $path = ''): string
+    {
+        $databaseDir = base_path('database');
+        
+        if (empty($path)) {
+            return $databaseDir;
+        }
+        
+        // Ensure path doesn't start with directory separator
+        $path = ltrim($path, DIRECTORY_SEPARATOR);
+        
+        return $databaseDir . DIRECTORY_SEPARATOR . $path;
     }
 }
 
@@ -1342,5 +1367,31 @@ if (!function_exists('http_api')) {
     {
         $request = HttpRequest::createFromGlobals();
         return $request->api($url, $method, $data, $headers);
+    }
+}
+
+if (!function_exists('query_builder')) {
+    /**
+     * Get the QueryBuilder instance
+     *
+     * @param string $table
+     * @return QueryBuilder
+     */
+    function query_builder(string $table = ''): QueryBuilder
+    {
+        return new QueryBuilder($table);
+    }
+}
+
+if (!function_exists('cached_query_builder')) {
+    /**
+     * Get the CachedQueryBuilder instance
+     *
+     * @param string $table
+     * @return CachedQueryBuilder
+     */
+    function cached_query_builder(string $table = ''): CachedQueryBuilder
+    {
+        return new CachedQueryBuilder(new QueryBuilder($table), resolve(CacheManager::class));
     }
 }

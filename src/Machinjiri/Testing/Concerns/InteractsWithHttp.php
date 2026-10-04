@@ -50,21 +50,6 @@ trait InteractsWithHttp
         $this->assertStringContainsString($text, $response->getBody());
     }
 
-    protected function assertResponseOk(HttpResponse $response): void
-    {
-        $this->assertEquals(200, $response->getStatusCode(), 'Response status is not 200 OK');
-    }
-    
-    protected function assertStatus(int $status, HttpResponse $response): void
-    {
-        $this->assertEquals($status, $response->getStatusCode());
-    }
-    
-    protected function assertSee(string $text, HttpResponse $response): void
-    {
-        $this->assertStringContainsString($text, $response->getBody());
-    }
-    
     protected function assertSeeText(string $text, HttpResponse $response): void
     {
         $body = strip_tags($response->getBody());

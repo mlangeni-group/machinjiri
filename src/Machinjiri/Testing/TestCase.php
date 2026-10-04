@@ -6,24 +6,24 @@ use PHPUnit\Framework\TestCase as BaseTestCase;
 use Mlangeni\Machinjiri\Core\Container;
 use Mlangeni\Machinjiri\Core\Machinjiri;
 use Mlangeni\Machinjiri\Testing\Concerns\InteractsWithApplication;
-use Mlangeni\Machinjiri\Testing\Concerns\InteractsWithContainer;
-use Mlangeni\Machinjiri\Testing\Concerns\InteractsWithHttp;
-use Mlangeni\Machinjiri\Testing\Concerns\InteractsWithDatabase;
-use Mlangeni\Machinjiri\Testing\Concerns\InteractsWithSession;
 use Mlangeni\Machinjiri\Testing\Concerns\InteractsWithAuthentication;
 use Mlangeni\Machinjiri\Testing\Concerns\InteractsWithConsole;
-use Mlangeni\Machinjiri\Testing\Concerns\InteractsWithException;
+use Mlangeni\Machinjiri\Testing\Concerns\InteractsWithContainer;
 use Mlangeni\Machinjiri\Testing\Concerns\InteractsWithCoverage;
-use Mlangeni\Machinjiri\Testing\Concerns\InteractsWithMail;
-use Mlangeni\Machinjiri\Testing\Concerns\InteractsWithQueue;
+use Mlangeni\Machinjiri\Testing\Concerns\InteractsWithDatabase;
 use Mlangeni\Machinjiri\Testing\Concerns\InteractsWithEvents;
-use Mlangeni\Machinjiri\Testing\Concerns\InteractsWithMocks;
+use Mlangeni\Machinjiri\Testing\Concerns\InteractsWithException;
 use Mlangeni\Machinjiri\Testing\Concerns\InteractsWithFactories;
-use Mlangeni\Machinjiri\Testing\Concerns\SnapshotAssertions;
+use Mlangeni\Machinjiri\Testing\Concerns\InteractsWithHttp;
+use Mlangeni\Machinjiri\Testing\Concerns\InteractsWithMail;
+use Mlangeni\Machinjiri\Testing\Concerns\InteractsWithMocks;
+use Mlangeni\Machinjiri\Testing\Concerns\InteractsWithQueue;
+use Mlangeni\Machinjiri\Testing\Concerns\InteractsWithSession;
 use Mlangeni\Machinjiri\Testing\Concerns\InteractsWithTime;
+use Mlangeni\Machinjiri\Testing\Concerns\SnapshotAssertions;
 use Mlangeni\Machinjiri\Testing\Traits\RefreshDatabase;
-use Mlangeni\Machinjiri\Testing\Traits\WithoutMiddleware;
 use Mlangeni\Machinjiri\Testing\Traits\WithFaker;
+use Mlangeni\Machinjiri\Testing\Traits\WithoutMiddleware;
 
 abstract class TestCase extends BaseTestCase
 {
@@ -45,12 +45,24 @@ abstract class TestCase extends BaseTestCase
         InteractsWithTime,
         RefreshDatabase,
         WithoutMiddleware,
-        WithFaker;
+        WithFaker {
+            InteractsWithDatabase::setUpDatabase as baseSetUpDatabase;
+            RefreshDatabase::setUpDatabase as refreshDatabaseSetUp;
+        }
+
+    protected function setUpDatabase(): void
+    {
+        $this->baseSetUpDatabase();
+
+        if (method_exists($this, 'beginDatabaseTransaction')) {
+            $this->beginDatabaseTransaction();
+        }
+    }
 
     /**
      * The application instance.
      */
-    protected Machinjiri $app;
+    protected ?Machinjiri $app = null;
 
     /**
      * Set up the test environment.
@@ -65,6 +77,7 @@ abstract class TestCase extends BaseTestCase
         }
 
         $this->setUpApplication();
+        $this->setUpWithoutMiddleware();
         $this->setUpFaker();
         $this->setUpDatabase();
         $this->setUpSession();
@@ -79,6 +92,22 @@ abstract class TestCase extends BaseTestCase
     protected function setUpApplication(): void
     {
         $basePath = dirname(__DIR__, 3); // Project root
+
+        $requiredPaths = [
+            $basePath . '/config',
+            $basePath . '/routes',
+            $basePath . '/storage',
+        ];
+
+        if (count(array_filter($requiredPaths, 'is_dir')) !== count($requiredPaths)) {
+            return;
+        }
+
+        $envPath = $basePath . '/.env';
+        if (!is_file($envPath)) {
+            file_put_contents($envPath, "APP_NAME=Machinjiri\nAPP_ENV=testing\nAPP_DEBUG=true\nAPP_KEY=local-testing-key\nDB_CONNECTION=sqlite\nDB_DATABASE=:memory:\nMAIL_MAILER=array\nSESSION_DRIVER=array\nSESSION_LIFETIME=120\nCSRF_TOKEN_NAME=csrf_token\n");
+        }
+
         $this->app = Machinjiri::App($basePath . '/src', true);
         $this->app->initialize();
 
@@ -125,7 +154,7 @@ abstract class TestCase extends BaseTestCase
     /**
      * Get the application instance.
      */
-    public function app(): Machinjiri
+    public function app(): ?Machinjiri
     {
         return $this->app;
     }

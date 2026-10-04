@@ -20,7 +20,7 @@ trait InteractsWithQueue
         });
     }
 
-    protected function assertJobPushed(string $jobClass, callable $callback = null): void
+    protected function assertJobPushed(string $jobClass, ?callable $callback = null): void
     {
         $jobs = $GLOBALS['__queue_fake_jobs'] ?? [];
         $found = false;

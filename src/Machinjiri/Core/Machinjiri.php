@@ -22,6 +22,7 @@ namespace Mlangeni\Machinjiri\Core;
 use Mlangeni\Machinjiri\Core\Exceptions\ErrorHandler\ErrorHandler;
 use Mlangeni\Machinjiri\Core\Exceptions\MachinjiriException;
 use Mlangeni\Machinjiri\Core\Artisans\Helpers\DotEnv;
+use Mlangeni\Machinjiri\Core\Artisans\Helpers\HelperLoader;
 use Mlangeni\Machinjiri\Core\Artisans\Logging\Logger;
 use Mlangeni\Machinjiri\Core\Artisans\Events\EventListener;
 
@@ -56,6 +57,8 @@ final class Machinjiri extends Container
      */
     public static function App(string $appBasePath, ?bool $dev = null): self
     {
+       HelperLoader::getHelperMethods();
+
        if (self::$instance === null) {
            self::$environment = $dev ?? self::resolveDebugMode($appBasePath);
            self::$instance = new self($appBasePath, self::$environment);

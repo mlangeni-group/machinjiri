@@ -4,7 +4,21 @@ This document summarizes the major upgrades delivered in the current Machinjiri 
 
 ## Overview
 
-Machinjiri continues to evolve as a modular PHP framework aimed at speed, reliability, and developer productivity. The most recent release strengthens the platform across core infrastructure, developer tooling, application lifecycle management, security, and background processing.
+Machinjiri continues to evolve as a modular PHP framework aimed at speed, reliability, and developer productivity. The current release strengthens the platform across core infrastructure, developer tooling, application lifecycle management, security, distributed integrations, and background processing.
+
+## Release Highlights
+
+- Added support for modern PHP runtimes, including **PHP 8.3+** and PHP 8.4 compatibility
+- Standardized framework metadata and package versioning around the current `2.2.6` release
+- Improved application bootstrap flow and container initialization for cleaner startup and more predictable service resolution
+- Strengthened service provider registration and binding behavior for modular dependency injection and lazy loading
+- Expanded Artisan commands and generator workflows for faster project scaffolding, maintenance, and developer tasks
+- Improved queue workers and job execution behavior for more resilient background processing and retry handling
+- Strengthened the task scheduler with persistent state, cron scheduling, overlap protection, retry logic, and operational health checks
+- Added more complete webhook management with provider subscriptions, HMAC verification, safe async/sync routing, and idempotency support
+- Extended notification routing across mail, SMS, database, and webhooks with configurable channel management
+- Improved LDAP, Redis, FTP, and filesystem/cloud integration support for enterprise and distributed environments
+- Refined exception handling, logging, profiling, and debugging responsibilities for better diagnostics and runtime visibility
 
 ## Platform and Compatibility Upgrades
 
@@ -13,6 +27,7 @@ Machinjiri continues to evolve as a modular PHP framework aimed at speed, reliab
 - Improved application bootstrap flow and container bootstrapping for better startup consistency
 - Tightened integration with Symfony Console, Filesystem, and Process components for CLI and generator tooling
 - Improved provider registration and service binding behavior for cleaner dependency injection flows
+- Updated compatibility assumptions for modern composer-driven development workflows and runtime environments
 
 ## Core Framework Improvements
 
@@ -103,4 +118,6 @@ Machinjiri continues to evolve as a modular PHP framework aimed at speed, reliab
 
 ## Summary
 
-The `2.2.6` release focuses on making Machinjiri more robust, modular, and developer-friendly. The framework now offers a more complete foundation for building secure, scalable web applications with modern PHP practices, strong operational tooling, and production-oriented infrastructure support.
+The `2.2.6` release focuses on making Machinjiri more robust, modular, and developer-friendly. The framework now provides a stronger foundation for building secure, scalable web applications with modern PHP practices, richer enterprise integrations, dependable background processing, and production-oriented operational tooling.
+
+The result is a platform that is easier to bootstrap, easier to extend, and better suited to real-world application deployment across web, API, and internal-system workloads.

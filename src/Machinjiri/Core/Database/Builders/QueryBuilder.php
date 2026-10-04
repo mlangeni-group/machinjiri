@@ -27,10 +27,15 @@ class QueryBuilder {
 
     protected Grammar $grammar;
 
-    public function __construct(string $table)
+    public function __construct(string $table = '')
     {
         $this->table = $table;
         $this->grammar = DatabaseConnection::getGrammar();
+    }
+
+    public static function builder(string $table): self 
+    {
+        return new self($table);
     }
 
     // SELECT operations

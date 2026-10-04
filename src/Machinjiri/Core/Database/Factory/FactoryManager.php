@@ -3,8 +3,10 @@
 namespace Mlangeni\Machinjiri\Core\Database\Factory;
 
 use Mlangeni\Machinjiri\Core\Container;
-use Mlangeni\Machinjiri\Core\Exceptions\MachinjiriException;
+use Mlangeni\Machinjiri\Core\Exceptions\DatabaseException;
 use Mlangeni\Machinjiri\Core\Database\DatabaseConnection;
+use Mlangeni\Machinjiri\Core\Database\Builders\QueryBuilder;
+
 use ReflectionClass;
 use Faker\Factory as FakerFactory;
 use Faker\Generator;
@@ -26,10 +28,8 @@ class FactoryManager
         
         // Initialize Faker
         if (!class_exists(FakerFactory::class)) {
-            throw new MachinjiriException(
-                "FakerPHP library is required. Install with: composer require fakerphp/faker",
-                500
-            );
+            throw DatabaseException::FactoryError(
+                "FakerPHP library is required. Install with: composer require fakerphp/faker");
         }
         
         $this->faker = FakerFactory::create();
@@ -47,10 +47,7 @@ class FactoryManager
         
         // Check if file already exists
         if (file_exists($fullPath) && !$overwrite) {
-            throw new MachinjiriException(
-                "Factory file '{$filename}' already exists. Use --force to overwrite.",
-                500
-            );
+            throw DatabaseException::FactoryError("Factory file '{$filename}' already exists. Use --force to overwrite.");
         }
         
         $className = $this->getClassName($model);
@@ -71,7 +68,7 @@ class FactoryManager
         );
         
         if (file_put_contents($fullPath, $content) === false) {
-            throw new MachinjiriException("Failed to create factory file: {$fullPath}", 500);
+            throw DatabaseException::FactoryError("Failed to create factory file: {$fullPath}");
         }
         $this->created = true;
         return $fullPath;
@@ -82,32 +79,7 @@ class FactoryManager
      */
     public function run(string $model, int $count = 1, array $attributes = []): array
     {
-        $filename = $this->getFactoryFileName($model);
-        $fullPath = $this->factoriesPath . $filename;
-        
-        if (!file_exists($fullPath)) {
-            throw new MachinjiriException("Factory file not found: {$filename}", 404);
-        }
-        
-        require_once $fullPath;
-        
-        $className = $this->getClassName($model);
-        $namespace = $this->getFactoryNamespace();
-        $fullClassName = $namespace . "\\" . $className;
-        
-        if (!class_exists($fullClassName)) {
-            throw new MachinjiriException("Factory class '{$namespace}{$className}' not found in file.", 500);
-        }
-        
-        // Get table name from factory or guess
-        $factoryInstance = new $fullClassName($this->faker);
-        
-        if (!method_exists($factoryInstance, 'definition')) {
-            throw new MachinjiriException(
-                "Factory class must have a 'definition()' method",
-                500
-            );
-        }
+        $factoryInstance = $this->getFactoryClass($model);
         
         $records = [];
         $startTime = microtime(true);
@@ -119,7 +91,7 @@ class FactoryManager
             // Insert into database
             $tableName = $factoryInstance->getTableName() ?? $this->getTableName($model);
             
-            $query = new \Mlangeni\Machinjiri\Core\Database\QueryBuilder($tableName);
+            $query = new QueryBuilder($tableName);
             $result = $query->insert($record)->execute();
             
             $record['id'] = $result['lastInsertId'] ?? null;
@@ -181,30 +153,7 @@ class FactoryManager
         
         foreach ($models as $model) {
             try {
-                $filename = $this->getFactoryFileName($model);
-                $fullPath = $this->factoriesPath . $filename;
-                
-                if (!file_exists($fullPath)) {
-                    continue;
-                }
-                
-                require_once $fullPath;
-                
-                $className = $this->getClassName($model);
-                $namespace = $this->getFactoryNamespace();
-                $fullClassName = $namespace . $className;
-                
-                if (!class_exists($fullClassName)) {
-                    // Try alternative namespace
-                    $altNamespace = 'Database\\Factories\\';
-                    $fullClassName = $altNamespace . $className;
-                    
-                    if (!class_exists($fullClassName)) {
-                        continue;
-                    }
-                }
-                
-                $factoryInstance = new $fullClassName($this->faker);
+                $factoryInstance = $this->getFactoryClass($model);
                 
                 if (method_exists($factoryInstance, 'migration')) {
                     $migration = $factoryInstance->migration();
@@ -212,7 +161,7 @@ class FactoryManager
                     if (is_array($migration)) {
                         $tableName = $factoryInstance->getTableName() ?? $this->getTableName($model);
                         
-                        $query = new \Mlangeni\Machinjiri\Core\Database\QueryBuilder('');
+                        $query = new QueryBuilder('');
                         $sql = $query->createTable($tableName, $migration)->compileCreateTable();
                         
                         DatabaseConnection::executeQuery($sql);
@@ -258,43 +207,41 @@ class FactoryManager
         
         return $factories;
     }
-    
-    /**
-     * Generate fake data without saving to database
-     */
-    public function fake(string $model, int $count = 1, array $attributes = []): array
+
+    private function getFactoryClass(string $model): ?object 
     {
         $filename = $this->getFactoryFileName($model);
         $fullPath = $this->factoriesPath . $filename;
         
         if (!file_exists($fullPath)) {
-            throw new MachinjiriException("Factory file not found: {$filename}", 404);
+            throw DatabaseException::FactoryError("Factory file not found: {$filename}");
         }
         
         require_once $fullPath;
         
         $className = $this->getClassName($model);
         $namespace = $this->getFactoryNamespace();
-        $fullClassName = $namespace . $className;
+        $fullClassName = $namespace . '\\' . $className;
         
-        if (!class_exists($fullClassName)) {
-            // Try alternative namespace
-            $altNamespace = 'Database\\Factories\\';
-            $fullClassName = $altNamespace . $className;
-            
-            if (!class_exists($fullClassName)) {
-                throw new MachinjiriException("Factory class '{$namespace}{$className}' not found in file.", 500);
-            }
+        if (!class_exists($fullClassName) ) {
+            throw DatabaseException::FactoryError("Factory class '{$namespace}\\{$className}' not found in file.");
         }
-        
-        $factoryInstance = new $fullClassName($this->faker);
-        
-        if (!method_exists($factoryInstance, 'definition')) {
-            throw new MachinjiriException(
-                "Factory class must have a 'definition()' method",
-                500
-            );
+
+        $factory = new $fullClassName($this->faker);
+
+        if (!method_exists($factory, 'definition')) {
+            throw DatabaseException::FactoryError("Method definition in '{$namespace}\\{$className}' not found.");
         }
+
+        return $factory;
+    }
+    
+    /**
+     * Generate fake data without saving to database
+     */
+    public function fake(string $model, int $count = 1, array $attributes = []): array
+    {
+        $factoryInstance = $this->getFactoryClass($model);
         
         $records = [];
         
@@ -328,8 +275,9 @@ class FactoryManager
 namespace {{Namespace}};
 
 use Faker\Generator;
+use Mlangeni\Machinjiri\Core\Database\Contracts\FactoryInterface;
 
-class {{ClassName}}
+class {{ClassName}} implements FactoryInterface
 {
     protected Generator $faker;
     protected string $table = '{{TableName}}';

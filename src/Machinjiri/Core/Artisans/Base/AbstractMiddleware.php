@@ -5,13 +5,14 @@ namespace Mlangeni\Machinjiri\Core\Artisans\Base;
 use Mlangeni\Machinjiri\Core\Exceptions\MachinjiriException;
 use Mlangeni\Machinjiri\Core\Http\HttpRequest;
 use Mlangeni\Machinjiri\Core\Http\HttpResponse;
+use Mlangeni\Machinjiri\Core\Kernel\Base\Middleware;
 
 /**
  * Base Middleware Class
  *
  * All application middleware must extend this class and implement the handle() method.
  */
-abstract class AbstractMiddleware
+abstract class AbstractMiddleware implements Middleware
 {
     /**
      * Process the request and optionally call the next middleware.

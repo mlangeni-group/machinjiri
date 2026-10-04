@@ -4,7 +4,7 @@ namespace Mlangeni\Machinjiri\Core\Database\Schema;
 
 use Mlangeni\Machinjiri\Core\Database\Builders\QueryBuilder;
 use Mlangeni\Machinjiri\Core\Database\Builders\ColumnBuilder;
-use Mlangeni\Machinjiri\Core\Exceptions\MachinjiriException;
+use Mlangeni\Machinjiri\Core\Exceptions\DatabaseException;
 
 class Blueprint
 {
@@ -617,7 +617,7 @@ class Blueprint
                 $this->buildDropTableIfExists();
                 break;
             default:
-                throw new MachinjiriException("Unknown blueprint action: {$this->action}");
+                throw DatabaseException::SchemaError("Unknown blueprint action: {$this->action}");
         }
     }
 
@@ -768,7 +768,7 @@ class Blueprint
             return substr($column, 0, -4);
         }
         
-        throw new MachinjiriException(
+        throw DatabaseException::SchemaError(
             "Could not guess table name from column '{$column}'. " .
             "Please specify the table name explicitly."
         );
@@ -816,7 +816,7 @@ class Blueprint
         if (method_exists($this->query, $method)) {
             $columnName = $arguments[0] ?? null;
             if (!$columnName) {
-                throw new MachinjiriException("Column name required for method: {$method}");
+                throw DatabaseException::SchemaError("Column name required for method: {$method}");
             }
             
             $column = call_user_func_array([$this->query, $method], $arguments);
@@ -824,7 +824,7 @@ class Blueprint
             return $column;
         }
         
-        throw new MachinjiriException("Method {$method} not found in Blueprint or QueryBuilder");
+        throw DatabaseException::SchemaError("Method {$method} not found in Blueprint or QueryBuilder");
     }
     
     /**

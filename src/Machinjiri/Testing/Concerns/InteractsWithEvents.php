@@ -19,7 +19,7 @@ trait InteractsWithEvents
         });
     }
 
-    protected function assertEventDispatched(string $eventClass, callable $callback = null): void
+    protected function assertEventDispatched(string $eventClass, ?callable $callback = null): void
     {
         $events = $GLOBALS['__event_fake_dispatched'] ?? [];
         $found = false;
