@@ -7,9 +7,10 @@ use Mlangeni\Machinjiri\Core\Authentication\Session;
 class Cookie {
 
   private Session $session;
+  private Container $app;
 
-  public function __construct(private Container $app) {
-      $this->session = new Session($app);
+  public function __construct(?Container $app = null) {
+      $this->session = new Session($app ?? $this->getApp());
   }
 
   public function set(string $name, mixed $value, int $expire = 0, string $path = '', string $domain = '', bool $secure = false, bool $httponly = true): bool {
@@ -33,5 +34,17 @@ class Cookie {
 
   public function has(string $name): bool {
     return isset($_COOKIE[$name]);
+  }
+
+  private function getApp(): ?Container 
+  {
+    if (function_exists('app')) {
+      return app();
+    }
+
+    if (Container::instancePresent()) {
+      return Container::getInstance();
+    }
+    return null;
   }
 }

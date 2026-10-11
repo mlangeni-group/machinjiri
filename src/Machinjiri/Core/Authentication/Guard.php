@@ -1,6 +1,6 @@
 <?php
 
-namespace Mlangeni\Machinjiri\Facade\Authentication;
+namespace Mlangeni\Machinjiri\Core\Authentication;
 
 interface Guard
 {

@@ -1,9 +1,9 @@
 <?php
 
-namespace Mlangeni\Machinjiri\Facade\Authentication\Models;
+namespace Mlangeni\Machinjiri\Core\Authentication\Models;
 
 use Mlangeni\Machinjiri\Core\Artisans\Base\AbstractModel;
-use Mlangeni\Machinjiri\Facade\Authentication\Authenticatable;
+use Mlangeni\Machinjiri\Core\Authentication\Authenticatable;
 
 class User extends AbstractModel implements Authenticatable
 {

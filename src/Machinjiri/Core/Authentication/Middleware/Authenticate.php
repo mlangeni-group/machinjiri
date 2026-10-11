@@ -1,11 +1,11 @@
 <?php
 
-namespace Mlangeni\Machinjiri\Facade\Authentication\Middleware;
+namespace Mlangeni\Machinjiri\Core\Authentication\Middleware;
 
 use Mlangeni\Machinjiri\Core\Artisans\Base\AbstractMiddleware;
 use Mlangeni\Machinjiri\Core\Http\HttpRequest;
 use Mlangeni\Machinjiri\Core\Http\HttpResponse;
-use Mlangeni\Machinjiri\Facade\Authentication\Auth;
+use Mlangeni\Machinjiri\Core\Authentication\Auth;
 
 class Authenticate extends AbstractMiddleware
 {

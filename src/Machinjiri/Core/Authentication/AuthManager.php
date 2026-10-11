@@ -6,16 +6,16 @@ use Mlangeni\Machinjiri\Core\Container;
 use Mlangeni\Machinjiri\Core\Exceptions\AuthenticationException;
 use Mlangeni\Machinjiri\Core\Artisans\Events\EventListener;
 use Mlangeni\Machinjiri\Core\Artisans\Logging\Logger;
-use Mlangeni\Machinjiri\Facade\Authentication\Guard;
-use Mlangeni\Machinjiri\Facade\Authentication\Authenticatable;
+use Mlangeni\Machinjiri\Core\Authentication\Guard;
+use Mlangeni\Machinjiri\Core\Authentication\Authenticatable;
 use Mlangeni\Machinjiri\Core\Authentication\UserProviders\{DatabaseUserProvider, OAuthUserProvider, UserProvider};
-use Mlangeni\Machinjiri\Facade\Authentication\Guards\{SessionGuard, TokenGuard, JwtGuard};
+use Mlangeni\Machinjiri\Core\Authentication\Guards\{SessionGuard, TokenGuard, JwtGuard};
 use Mlangeni\Machinjiri\Core\Security\Encryption\Bangwe;
 use Mlangeni\Machinjiri\Core\Security\Hashing\Hasher;
 use Mlangeni\Machinjiri\Core\Authentication\ThirdParty\ThirdPartyAuth;
 use Mlangeni\Machinjiri\Core\Authentication\{Session, Cookie};
 use Mlangeni\Machinjiri\Core\Artisans\Caching\CacheManager;
-use Mlangeni\Machinjiri\Facade\Authentication\Models\User;
+use Mlangeni\Machinjiri\Core\Authentication\Models\{User, LdapModel};
 use Mlangeni\Machinjiri\Core\Database\Builders\QueryBuilder;
 use Mlangeni\Machinjiri\Core\Authentication\UserProviders\LdapUserProvider;
 
@@ -83,7 +83,7 @@ class AuthManager
         $hasher = $config['hasher'] ?? $this->container->resolve(Hasher::class);
         $userProvider = $this->createUserProvider($config);
         $cache = $this->container->resolve(CacheManager::class);
-        $rememberExpiration = $config['remember_expiration'] ?? 30 * 24 * 60 * 60;
+        $rememberExpiration = $config['remember_expiration'] ?? 7 * 24 * 60 * 60;
 
         return new SessionGuard(
             $session,
@@ -128,7 +128,7 @@ class AuthManager
             case 'ldap':
                 // Uses supplied LDAP components
                 $ldapManager = $this->container->resolve('ldap.manager');
-                $model = $providerConfig['model'] ?? User::class;
+                $model = $providerConfig['model'] ?? LdapModel::class;
                 return new LdapUserProvider(
                     $ldapManager,
                     $model,

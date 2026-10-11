@@ -107,12 +107,12 @@ class Entry implements ArrayAccess
         }
 
         // Query LDAP for group members
-        $conn = Container::resolve(Connection::class); // or better to pass connection
+        $conn = Container::resolve(Connection::class);
         $query = $conn->query()
             ->baseDn($this->baseDn)
             ->select(['member'])
-            ->where('dn', '=', $groupDn); // actually we need to search by DN? Typically we read the group entry directly.
-        // Better: use ldap_read to get the group entry by DN.
+            ->where('dn', '=', $groupDn);
+        
         $result = $conn->getLink();
         $search = ldap_read($result, $groupDn, '(objectClass=*)', ['member']);
         if ($search) {

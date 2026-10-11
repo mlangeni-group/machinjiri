@@ -332,7 +332,7 @@ class ThirdPartyAuth
 
             // Handle provider-specific response formats
             return $this->normalizeUserInfo($provider, $data);
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             $this->log('error', "Failed to fetch user info from {provider}: {message}", 
                 ['provider' => $provider, 'message' => $e->getMessage()]);
             throw $e;

@@ -1,9 +1,9 @@
 <?php
 
-namespace Mlangeni\Machinjiri\Facade\Authentication\Guards;
+namespace Mlangeni\Machinjiri\Core\Authentication\Guards;
 
-use Mlangeni\Machinjiri\Facade\Authentication\Guard;
-use Mlangeni\Machinjiri\Facade\Authentication\Authenticatable;
+use Mlangeni\Machinjiri\Core\Authentication\Guard;
+use Mlangeni\Machinjiri\Core\Authentication\Authenticatable;
 use Mlangeni\Machinjiri\Core\Authentication\Session;
 use Mlangeni\Machinjiri\Core\Authentication\Cookie;
 use Mlangeni\Machinjiri\Core\Authentication\UserProviders\UserProvider;
@@ -12,6 +12,7 @@ use Mlangeni\Machinjiri\Core\Artisans\Events\EventListener;
 use Mlangeni\Machinjiri\Core\Artisans\Logging\Logger;
 use Mlangeni\Machinjiri\Core\Artisans\Caching\CacheManager;
 use Mlangeni\Machinjiri\Core\Exceptions\AuthenticationException;
+use Mlangeni\Machinjiri\Core\Authentication\Models\LdapModel;
 
 class SessionGuard implements Guard
 {
@@ -58,9 +59,9 @@ class SessionGuard implements Guard
 
     public function user(): ?Authenticatable
     {
-        if ($this->loggedOut) {
-            return null;
-        }
+        // if ($this->loggedOut) {
+        //     return null;
+        // }
 
         if (!is_null($this->user)) {
             return $this->user;
@@ -103,10 +104,24 @@ class SessionGuard implements Guard
     public function validate(array $credentials): bool
     {
         $user = $this->provider->retrieveByCredentials($credentials);
-        if ($user && $this->hasher->verify($credentials['password'] ?? '', $user->getAuthPassword())) {
+
+        if ($user === null) {
+            $this->logger->info('User not found during validation', ['credentials' => array_keys($credentials)]);
+            return false;
+        }
+
+        if ($user instanceof LdapModel) {
+            $this->logger->info('LDAP user found during validation', ['username' => $user->getAuthIdentifier()]);
+            $this->user = $user;
             return true;
         }
-        return false;
+
+        if ($user && $this->hasher->verify($credentials['password'] ?? '', $user->getAuthPassword())) {
+            $this->user = $user;
+            return true;
+        }
+        
+        return true;
     }
 
     public function setUser(Authenticatable $user): void
@@ -114,13 +129,13 @@ class SessionGuard implements Guard
         $this->user = $user;
         $this->loggedOut = false;
         $this->session->regenerateId();
-        $this->session->set('user_id', $user->getAuthIdentifier());
+        $this->session->set('user_login', $user->getAuthIdentifier());
     }
 
     public function attempt(array $credentials, bool $remember = false): bool
     {
         $user = $this->provider->retrieveByCredentials($credentials);
-        if ($user && $this->hasher->verify($credentials['password'] ?? '', $user->getAuthPassword())) {
+        if ($this->validate($credentials)) {
             $this->login($user, $remember);
             return true;
         }

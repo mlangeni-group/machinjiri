@@ -16,8 +16,9 @@ class Session {
     public HttpRequest $request;
     public array $config;
 
-    public function __construct(Container $app) {
-        $this->request = $app->resolve(HttpRequest::class);
+    public function __construct(?Container $app = null) {
+        $this->app = $app ?? $this->getApp();
+        $this->request = $this->app->resolve(HttpRequest::class);
         $this->config = array_merge(self::defaultConfig(), $this->getAppConfigurations());
         
         $this->loadSessionConfig();
@@ -160,6 +161,18 @@ class Session {
           session_start();
           $this->initializeSession();
       }
+    }
+
+    private function getApp(): ?Container 
+    {
+        if (function_exists('app')) {
+        return app();
+        }
+
+        if (Container::instancePresent()) {
+        return Container::getInstance();
+        }
+        return null;
     }
     
 }
