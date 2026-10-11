@@ -1,22 +1,26 @@
 <?php
 
-namespace Mlangeni\Machinjiri\Facade\Authentication\Guards;
+namespace Mlangeni\Machinjiri\Core\Authentication\Guards;
 
-use Mlangeni\Machinjiri\Facade\Authentication\Guard;
-use Mlangeni\Machinjiri\Facade\Authentication\Authenticatable;
+use Mlangeni\Machinjiri\Core\Authentication\Guard;
+use Mlangeni\Machinjiri\Core\Authentication\Authenticatable;
 use Mlangeni\Machinjiri\Core\Authentication\UserProviders\UserProvider;
+use Mlangeni\Machinjiri\Core\Security\Encryption\Bangwe;
 use Mlangeni\Machinjiri\Core\Http\HttpRequest;
 use Mlangeni\Machinjiri\Core\Container;
+use Mlangeni\Machinjiri\Core\Exceptions\MachinjiriException;
 
-class TokenGuard implements Guard
+class JwtGuard implements Guard
 {
     protected ?Authenticatable $user = null;
     protected UserProvider $provider;
+    protected Bangwe $bangwe;
     protected HttpRequest $request;
 
-    public function __construct(UserProvider $provider, ?HttpRequest $request = null)
+    public function __construct(UserProvider $provider, Bangwe $bangwe, ?HttpRequest $request = null)
     {
         $this->provider = $provider;
+        $this->bangwe = $bangwe;
         $this->request = $request ?? resolve(HttpRequest::class);
     }
 
@@ -41,9 +45,18 @@ class TokenGuard implements Guard
             return null;
         }
 
-        // Use the 'api_token' column to retrieve the user
-        $this->user = $this->provider->retrieveByCredentials(['api_token' => $token]);
-        return $this->user;
+        try {
+            $payload = $this->bangwe->decodeToken($token);
+            $id = $payload->sub ?? null;
+            if (!$id) {
+                return null;
+            }
+            $this->user = $this->provider->retrieveById($id);
+            return $this->user;
+        } catch (MachinjiriException $e) {
+            // Token invalid or expired
+            return null;
+        }
     }
 
     public function id(): mixed
@@ -54,11 +67,11 @@ class TokenGuard implements Guard
 
     public function validate(array $credentials): bool
     {
-        $token = $credentials['api_token'] ?? $this->getTokenFromRequest();
+        $token = $credentials['token'] ?? $this->getTokenFromRequest();
         if (!$token) {
             return false;
         }
-        return !is_null($this->provider->retrieveByCredentials(['api_token' => $token]));
+        return $this->bangwe->validateToken($token);
     }
 
     public function setUser(Authenticatable $user): void
@@ -82,6 +95,16 @@ class TokenGuard implements Guard
         if ($header && preg_match('/Bearer\s+(.*)$/i', $header, $matches)) {
             return $matches[1];
         }
-        return $this->request->input('api_token');
+        return $this->request->input('token');
+    }
+
+    /**
+     * Generate a JWT for a given user.
+     * The expiration is controlled by the global JWT_EXPIRATION setting.
+     */
+    public function generateToken(Authenticatable $user, array $claims = []): string
+    {
+        $claims['sub'] = $user->getAuthIdentifier();
+        return $this->bangwe->createToken($claims);
     }
 }

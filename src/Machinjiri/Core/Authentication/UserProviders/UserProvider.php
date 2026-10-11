@@ -2,7 +2,7 @@
 
 namespace Mlangeni\Machinjiri\Core\Authentication\UserProviders;
 
-use Mlangeni\Machinjiri\Facade\Authentication\Authenticatable;
+use Mlangeni\Machinjiri\Core\Authentication\Authenticatable;
 
 interface UserProvider
 {

@@ -77,10 +77,11 @@ class Connection
         $this->connect();
         $this->events->trigger('ldap.binding', ['dn' => $dn]);
 
-        if (!ldap_bind($this->link, $dn, $password)) {
-            $error = ldap_error($this->link);
-            $this->logger->error('LDAP bind failed', ['dn' => $dn, 'error' => $error]);
-            throw new LdapException('LDAP bind failed: ' . $error, 401, null, ['dn' => $dn]);
+        try {
+            ldap_bind($this->link, $dn, $password);
+        } catch (\Throwable $e) {
+            $this->logger->error('LDAP bind failed', ['dn' => $dn, 'error' => $e->getMessage()]);
+            throw new LdapException('LDAP bind failed: ' . $e->getMessage(), 401, $e, ['dn' => $dn]);
         }
 
         $this->bound = true;

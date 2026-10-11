@@ -2,7 +2,7 @@
 
 namespace Mlangeni\Machinjiri\Core\Authentication\UserProviders;
 
-use Mlangeni\Machinjiri\Facade\Authentication\Authenticatable;
+use Mlangeni\Machinjiri\Core\Authentication\Authenticatable;
 use Mlangeni\Machinjiri\Core\Database\Builders\QueryBuilder;
 use Mlangeni\Machinjiri\Core\Artisans\Events\EventListener;
 use Mlangeni\Machinjiri\Core\Artisans\Logging\Logger;

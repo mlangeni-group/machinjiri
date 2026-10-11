@@ -2,7 +2,7 @@
 
 namespace Mlangeni\Machinjiri\Core\Authentication\UserProviders;
 
-use Mlangeni\Machinjiri\Facade\Authentication\Authenticatable;
+use Mlangeni\Machinjiri\Core\Authentication\Authenticatable;
 use Mlangeni\Machinjiri\Core\Authentication\ThirdParty\ThirdPartyAuth;
 use Mlangeni\Machinjiri\Core\Exceptions\AuthenticationException;
 use Mlangeni\Machinjiri\Core\Artisans\Logging\Logger;
@@ -46,10 +46,11 @@ class OAuthUserProvider implements UserProvider
         $provider = $credentials['provider'] ?? null;
         $accessToken = $credentials['access_token'] ?? $credentials['token'] ?? null;
 
-        if (!$provider || !$accessToken) {
-            $this->logger->warning('OAuth credentials missing provider or token');
-            return null;
-        }
+
+        // if (!$provider || !$accessToken) {
+        //     $this->logger->warning('OAuth credentials missing provider or token');
+        //     return null;
+        // }
 
         try {
             $userData = $this->thirdPartyAuth->authenticateWithToken($provider, $accessToken);

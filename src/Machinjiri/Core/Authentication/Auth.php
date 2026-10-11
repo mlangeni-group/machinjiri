@@ -1,6 +1,6 @@
 <?php
 
-namespace Mlangeni\Machinjiri\Facade\Authentication;
+namespace Mlangeni\Machinjiri\Core\Authentication;
 
 use Mlangeni\Machinjiri\Core\Authentication\AuthManager;
 use Mlangeni\Machinjiri\Core\Container;

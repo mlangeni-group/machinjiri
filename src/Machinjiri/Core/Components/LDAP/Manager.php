@@ -7,6 +7,7 @@ use Mlangeni\Machinjiri\Core\Artisans\Logging\Logger;
 use Mlangeni\Machinjiri\Core\Artisans\Events\EventListener;
 use Mlangeni\Machinjiri\Core\Artisans\Caching\CacheManager;
 use Mlangeni\Machinjiri\Core\Container;
+use Mlangeni\Machinjiri\Core\Components\LDAP\EntryManager;
 
 class Manager
 {
@@ -16,12 +17,21 @@ class Manager
     protected EventListener $events;
     protected CacheManager $cache;
 
+    private EntryManager $entryManager;
+
     public function __construct(array $config)
     {
         $this->config = $config;
         $this->logger = resolve(Logger::class);
         $this->events = resolve(EventListener::class);
         $this->cache = resolve(CacheManager::class);
+
+        $this->entryManager = new EntryManager(
+            $this->connection(),
+            $this->logger,
+            $this->events
+        );
+
     }
 
     public function connection(?string $name = null): Connection
@@ -47,4 +57,26 @@ class Manager
     {
         return $this->connection()->$method(...$parameters);
     }
+
+    public function create(string $dn, array $attrs): bool
+    {
+        return $this->entryManager->create($dn, $attrs);
+    }
+
+    public function read(string $dn, array $attributes = []): ?Entry
+    {
+        return $this->entryManager->read($dn, $attributes);
+    }
+
+    public function update(string $dn, array $attrs): bool
+    {
+        return $this->entryManager->update($dn, $attrs);
+    }
+
+    public function delete(string $dn): bool
+    {
+        return $this->entryManager->delete($dn);
+    }
+
+
 }
