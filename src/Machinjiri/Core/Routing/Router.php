@@ -426,7 +426,7 @@ class Router
                 'response' => $this->httpResponse
             ]));
             $body = $view->render();
-        } catch (ViewEngineException $e) {
+        } catch (\Throwable $e) {
             // Fallback if view not found
             $message = $context['message'] ?? 'An error occurred';
             $description = $context['description'] ?? 'An internal error has occurred';
