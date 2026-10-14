@@ -195,22 +195,22 @@ class TemplateGenerator
 <?php use Mlangeni\Machinjiri\Core\Views\View; ?>
 $layout
 
-<% section('title') %>
-    {{ $title ?? 'Welcome' }}
-<% endsection %>
+@section('title')
+    {{ \$title ?? 'Welcome' }}
+@endsection
 
-<% section('content') %>
+@section('content')
     <div class="container">
-        <h1>{{ $heading ?? 'Hello World' }}</h1>
-        <p>This is your view: {{ $__view__ }}</p>
+        <h1>{{ \$heading ?? 'Hello World' }}</h1>
+        <p>This is your view: {{ \$__view__ }}</p>
     </div>
-<% endsection %>
+@endsection
 
-<% section('styles') %>
+@section('styles')
     <style>
         .container { max-width: 800px; margin: 2rem auto; }
     </style>
-<% endsection %>
+@endsection
 HTML;
     }
     
@@ -229,22 +229,14 @@ STUB;
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><% section('title') %>Application<% endsection %></title>
-    <%- View::style('css/app.css') %>
-    <% section('styles') %>
-    <% endsection %>
+    <title>{{ $title ?? 'Page Title' }}</title>
+    <?php style('css/app.css') ?>
+    @yield('styles')
 </head>
 <body>
-    <% section('content') %>
-    <main>
-        <!-- Main content will be injected here -->
-        <% content %>
-    </main>
-    <% endsection %>
+    
+    @yield('content')
 
-    <%- View::script('js/app.js') %>
-    <% section('scripts') %>
-    <% endsection %>
 </body>
 </html>
 STUB;

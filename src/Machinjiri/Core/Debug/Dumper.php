@@ -170,18 +170,18 @@ class Dumper
         return <<<CSS
 <style>
 :root {
-    --bg: #f3f3f3;
-    --color: #2E2C2A;
-    --primary: #CD7350;
+    --bg: #dedede;
+    --color: #161922;
+    --primary: rgba(109, 91, 208, .10);
     --int: #7F9EB5;
-    --radius-sm: 0.165rem;
-    --border: #e2e8f0;
+    --radius-sm: 6px;
+    --border: #e6e8f1;
     --dump-color-dark: #3A3530DD;
 }
 @media (prefers-color-scheme: dark) {
     :root {
-        --bg: #2E2C2A;
-        --color: #CD7350;
+        --bg: #0f1116;
+        --color: #c8cdd8;
     }
     .machinjiri-dump.cozy-dump {
         background: var(--bg) !important;
@@ -201,12 +201,10 @@ body {
     padding: 1rem 1.2rem;
     margin: 1rem 0;
     overflow-x: auto;
-    border-left: 5px solid #CD7350;
     box-shadow: 0 6px 14px rgba(0, 0, 0, 0.04);
     backdrop-filter: blur(2px);
     border: 1px solid #F2E5D8;
     border-left-width: 5px;
-    border-left-color: #CD7350;
     border-radius: var(--radius-sm);
 
 }

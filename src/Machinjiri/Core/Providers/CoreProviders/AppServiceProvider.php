@@ -37,6 +37,11 @@ use Mlangeni\Machinjiri\Core\Components\LDAP\{
     Connection as LDAPConnection,
     EntryManager
 };
+use Mlangeni\Machinjiri\Core\Performance\{
+    Insight\Insight,
+    Insight\Reporters\ArrayReporter,
+    Insight\Reporters\JsonReporter
+};
 
 
 class AppServiceProvider extends ServiceProvider
@@ -247,6 +252,13 @@ class AppServiceProvider extends ServiceProvider
         });
 
 
+        // -------------------- Performance Components --------------------
+        // Insight and Mornitor are registered as singletons.
+        $this->singleton(Insight::class, function ($app) {
+            return new Insight();
+        });
+
+
         // -------------------- Aliases for Convenience --------------------
         // Provide shorter names for common services to simplify dependency resolution.
         $this->aliasMany([
@@ -273,6 +285,7 @@ class AppServiceProvider extends ServiceProvider
             'webhook.subscription.manager'  => WebhookSubscriptionManager::class,
             'ldap.manager'                  => LDAPManager::class,
             'ldap.connection'               => LDAPConnection::class,
+            'perf.insight.class'            => Insight::class,
         ]);
     }
 
