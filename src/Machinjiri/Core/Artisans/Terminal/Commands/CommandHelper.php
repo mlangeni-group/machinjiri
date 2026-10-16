@@ -1,12 +1,14 @@
 <?php
 
 namespace Mlangeni\Machinjiri\Core\Artisans\Terminal\Commands;
+
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Mlangeni\Machinjiri\Core\Container;
 use Mlangeni\Machinjiri\Core\Exceptions\MachinjiriException;
+use Mlangeni\Machinjiri\Core\Artisans\Events\Factory as EventListener;
 
 trait CommandHelper
 {
@@ -28,14 +30,15 @@ trait CommandHelper
     ): int {
         $ss = new SymfonyStyle($input, $output);
         $ss->title("Machinjiri - {$title}");
+        $context = ['module' => $title, 'handler' => $handler];
 
         try {
+            EventListener::artisan('command.execute.success', $context);
             return $handler($ss);
-        } catch (MachinjiriException $e) {
-            $ss->error($e->getMessage());
-            return Command::FAILURE;
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
+            EventListener::artisan('command.execute.failed', array_merge($context, ['error' => $e->getMessage()]));
             $ss->error('Error: ' . $e->getMessage());
+
             if ($output->isVerbose()) {
                 $ss->text('Trace: ' . $e->getTraceAsString());
             }

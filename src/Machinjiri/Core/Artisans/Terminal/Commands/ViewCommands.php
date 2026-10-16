@@ -39,15 +39,16 @@ class ViewCommands
                       $force = $input->getOption('force');
           
                       try {
-                          $generator = new TemplateGenerator(getcwd() . "/resources/views/");
+                          $generator = new TemplateGenerator(resource_path("views"));
                           $path = $generator->makeView($name, $layout, [], $force);
                           $ss->success("View '{$name}' created successfully");
                           $ss->text("Path: " . $path);
                           return Command::SUCCESS;
-                      } catch (MachinjiriException $e) {
+                      } catch (\Throwable $e) {
                           $ss->error($e->getMessage());
                           return Command::FAILURE;
                       }
+                      
                   });
               }
             },
