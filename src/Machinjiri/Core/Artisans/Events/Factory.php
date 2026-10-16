@@ -141,7 +141,7 @@ class Factory
     { return self::log('exceptions', $event, self::EXCEPTIONS_ID, $context, $level); }
 
     public static function artisan(string $event, array $context = [], string $level = 'info'): int
-    { return self::log('artisan', $event, self::ARTISAN_TERMINAL_ID, $context, $level); }
+    { return self::log('terminal', $event, self::ARTISAN_TERMINAL_ID, $context, $level); }
 
     public static function filesystem(string $event, array $context = [], string $level = 'info'): int
     { return self::log('filesystem', $event, self::FILE_SYSTEM_ID, $context, $level); }

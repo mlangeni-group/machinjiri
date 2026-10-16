@@ -176,21 +176,13 @@ class Dumper
     --int: #7F9EB5;
     --radius-sm: 6px;
     --border: #e6e8f1;
-    --dump-color-dark: #3A3530DD;
-}
-@media (prefers-color-scheme: dark) {
-    :root {
-        --bg: #0f1116;
-        --color: #c8cdd8;
-    }
-    .machinjiri-dump.cozy-dump {
-        background: var(--bg) !important;
-        color: var(--color) !important;
-    }
+    --dump-color-dark: #cccaca;
+    --font-weight: 700;
 }
 body {
-    padding: 1rem 3rem;
     background: var(--bg);
+    margin: 0;
+    padding: 0;
 }
 .machinjiri-dump.cozy-dump {
     background: var(--dump-color-dark);
@@ -199,15 +191,11 @@ body {
     font-size: 14px;
     line-height: 1.6;
     padding: 1rem 1.2rem;
-    margin: 1rem 0;
     overflow-x: auto;
-    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.04);
     backdrop-filter: blur(2px);
-    border: 1px solid #F2E5D8;
-    border-left-width: 5px;
-    border-radius: var(--radius-sm);
-
+    border-left: 4px solid rgb(52, 52, 56); 
 }
+
 .machinjiri-dump.cozy-dump pre {
     margin: 0;
     white-space: pre-wrap;
@@ -215,38 +203,38 @@ body {
     font-family: inherit;
 }
 .dump-null {
-    color: #D9735A;
-    font-weight: 500;
+    color: #52413c;
+    font-weight: var(--font-weight);
 }
 .dump-bool {
-    color: #D9735A;
-    font-weight: 500;
+    color: #ce402e;
+    font-weight: var(--font-weight);
 }
 .dump-int {
-    color: #7F9EB5;
+    color: #54748d;
 }
 .dump-float {
-    color: #7F9EB5;
+    color: #54748d;
 }
 .dump-string {
-    color: #C4633A;
+    color: #4a8139;
 }
 .dump-array {
-    color: #8A6E4B;
-    font-weight: 500;
+    color: #c29054;
+    font-weight: var(--font-weight);
 }
 .dump-object {
-    color: #8A6E4B;
-    font-weight: 500;
+    color: #7a2e31;
+    font-weight: var(--font-weight);
 }
 .dump-resource {
     color: #9B6B9E;
 }
 .dump-key {
-    color: #9C7A5C;
+    color: #132524b4;
 }
 .dump-property {
-    color: #9C7A5C;
+    color: #88470e;
 }
 </style>
 CSS;

@@ -57,7 +57,7 @@ class TemplateGenerator
             throw new MachinjiriException("Cannot create views directory: {$this->basePath}");
         }
 
-    }
+    } 
 
     /**
      * Generate a view file.
@@ -73,7 +73,7 @@ class TemplateGenerator
     {
         $layoutStub = null;
         if ($layout !== null) {
-            $layoutStub .= "<%= extend('" . addslashes($layout) . "'); %>";
+            $layoutStub .= "@extends('" . addslashes($layout) . "')";
         }
         $stub = $this->replacePlaceholders($this->viewStub($layoutStub), $data + ['__view__' => $name]);
 

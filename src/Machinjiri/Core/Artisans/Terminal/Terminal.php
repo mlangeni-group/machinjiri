@@ -31,7 +31,7 @@ class Terminal extends Application
 
     public function __construct()
     {
-        parent::__construct('Machinjiri Terminal', '1.1.0');
+        parent::__construct('Machinjiri Terminal', '1.2.0');
         $this->registerCommands();
     }
 
