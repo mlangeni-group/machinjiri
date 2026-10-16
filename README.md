@@ -2,15 +2,15 @@
 
 Machinjiri is a modular, production-ready PHP framework for building maintainable web applications, APIs, and internal tools with speed and clarity. It combines a resilient service container, expressive routing, database tooling, security helpers, queue processing, task scheduling, and modern developer tooling in a single cohesive platform.
 
-Current stable version: `2.2.6`
+Current stable version: `2.2.8`
 
-## What’s New in 2.2.6
+## What’s New in 2.2.8
 
-Machinjiri `2.2.6` focuses on production-readiness, cleaner application startup, and broader infrastructure support. The release strengthens the framework across the core container, CLI tooling, queue system, task scheduler, authentication integrations, and event-driven services.
+Machinjiri `2.2.8` focuses on production-readiness, cleaner application startup, and broader infrastructure support. The release strengthens the framework across the core container, CLI tooling, queue system, task scheduler, authentication integrations, and event-driven services.
 
 Highlights from this release include:
 
-- Updated the framework metadata and package versioning so the project is aligned with the current `2.2.6` release
+- Updated the framework metadata and package versioning so the project is aligned with the current `2.2.8` release
 - Confirmed compatibility with **PHP 8.3+**, including modern PHP 8.4 runtime environments
 - Improved application bootstrapping, container binding, and service provider registration for more predictable dependency resolution and startup flow
 - Expanded the Artisan CLI and code-generation ecosystem for faster scaffolding, job creation, scheduler administration, and project maintenance
