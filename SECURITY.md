@@ -7,17 +7,15 @@ This framework is actively maintained and supported for the following versions:
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 2.1.4   | :white_check_mark: |
-| 2.1.5   | :white_check_mark: |
-| 2.1.6   | :white_check_mark: |
-| 2.1.7   | :white_check_mark: |
-| 2.1.8   | :white_check_mark: |
-| 2.1.9   | :white_check_mark: |
-| 2.2.0   | :white_check_mark: |
 | 2.2.1   | :white_check_mark: |
 | 2.2.2   | :white_check_mark: |
 | 2.2.3   | :white_check_mark: |
 | 2.2.4   | :white_check_mark: |
+| 2.2.5   | :white_check_mark: |
+| 2.2.6   | :white_check_mark: |
+| 2.2.7   | :white_check_mark: |
+| 2.2.8   | :white_check_mark: |
+| 2.2.9   | :white_check_mark: |
 
 
 ## Reporting a Vulnerability
@@ -33,4 +31,4 @@ Please ensure you are using the latest version to benefit from security updates.
 
 ## Updates to This Policy
 This policy will be reviewed periodically and updated as necessary. 
-Last updated: 2026-09-06
+Last updated: 2026-10-20
