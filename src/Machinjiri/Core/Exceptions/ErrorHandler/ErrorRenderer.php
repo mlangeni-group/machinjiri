@@ -430,15 +430,6 @@ class ErrorRenderer
         $appVersion = getenv("APP_VERSION") ?? "1.0.0";
         $environment = getenv("APP_ENV") ?? "development";
 
-        $primaryColor = '';
-        $primaryDark = '#8b93a5';
-        $bgColor = '#dedede';
-        $cardBg = '#f6f8fa';
-        $textColor = '#161922';
-        $subtleBorder = '#e6e8f1';
-        $errorHighlight = '#FDE8E8';
-        $errorBorder = '#F5C6C6';
-
         echo <<<HTML
 <!DOCTYPE html>
 <html lang="en">
@@ -448,23 +439,20 @@ class ErrorRenderer
     <title>{$appName} - Error/Exception</title>
     <style>
         :root {
-            --primary: rgba(109, 91, 208, .10);
-            --primary-dark: rgb(109, 91, 208);
-            --danger: #D9735A;
-            --warning: #E8A87C;
-            --info: #7F9EB5;
-            --bg: {$bgColor};
-            --card-bg: {$cardBg};
-            --text: {$textColor};
-            --text-light: {$textColor};
-            --border: {$subtleBorder};
-            --shadow: 0 12px 32px -14px rgba(109, 91, 208, .10);
-            --radius: 12px;
-            --radius-sm: 6px;
-            --transition: all 0.2s ease;
-            --body-bg: radial-gradient(1200px 520px at 12% -15%, rgba(109, 91, 208, .20), transparent 60%),
-                        radial-gradient(900px 420px at 88% -5%, rgba(56, 189, 248, .15), transparent 55%),
-                        linear-gradient(180deg, #f7f8fc 0%, #ffffff 100%);
+            --primary: #6D5BD0;
+            --dark: #5A48B8;
+            --light: #8877E8;
+            --soft: #DDD7F9;
+            --secondary: #F2EFFE;
+            --medium: #CBC2F0;
+            --subtle: #E9E6FA;
+            --deep: #4B3E9E;
+            --lilac: #B9AFF0;
+            --warm: #FFFAE6;
+            --text: #4b3e9e;
+            --bg: #dddddd;
+            --card-bg: #faf9ff;
+            --shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
         }
 
         html {
@@ -473,14 +461,19 @@ class ErrorRenderer
 
         @media (prefers-color-scheme: dark) {
             :root {
-                --bg: #0f1116 !important;
-                --card-bg: #161922;
-                --text: #c8cdd8;
-                --text-light: #CBBBA8;
-                --border: #262a35;
-                --body-bg: radial-gradient(1200px 520px at 12% -15%, rgba(109, 91, 208, .24), transparent 60%),
-                            radial-gradient(900px 420px at 88% -5%, rgba(56, 189, 248, .13), transparent 55%),
-                            linear-gradient(180deg, #12141b 0%, #0f1116 100%) !important;
+                --primary: #8877E8;
+                --dark: #9D8FF0;
+                --light: #6D5BD0;
+                --soft: #4A3F7A;
+                --secondary: #2D2746;
+                --medium: #423B63;
+                --subtle: #5B4E9E;
+                --deep: #B9AFF0;
+                --lilac: #CFC6F0;
+                --warm: #F2E9FF;
+                --bg: #16141f !important;
+                --card-bg: #1e1b2b;
+                --text: #efedf7;
             }
 
             body.dark-mode .error-message { background: #3E332A; }
@@ -571,7 +564,7 @@ class ErrorRenderer
         }
         
         .app-info h1 {
-            color: var(--primary-dark);
+            color: var(--dark);
             margin-bottom: 0.25rem;
             font-size: 1.6rem;
             display: flex;
@@ -617,7 +610,6 @@ class ErrorRenderer
         .error-section {
             width: 74%;
             background: var(--card-bg);
-            backdrop-filter: blur(2px);
             border-radius: var(--radius);
             padding: 1.6rem;
             margin-bottom: 1.8rem;
@@ -715,7 +707,7 @@ class ErrorRenderer
         }
         
         .trace-item {
-            background: #FEF9F4;
+            background: var(--bg);
             border: 1px solid var(--border);
             border-left: 4px solid var(--primary);
             border-radius: var(--radius-sm);
@@ -1111,8 +1103,6 @@ HTML;
         self::$genericRendered['error'] = true;
         
         $appName = getenv("APP_NAME") ?? "Machinjiri";
-        $supportEmail = getenv("APP_SUPPORT_EMAIL") ?? "";
-        $errorId = uniqid('ERR-', true);
 
         echo <<<HTML
 <!DOCTYPE html>
@@ -1131,15 +1121,20 @@ HTML;
         }
 
         :root {
-            --bg: #dedede;
-            --card-bg: #f6f8fa;
-            --text-primary: #161922;
-            --text-muted: #4a4a6a;
-            --border-color: #e2e8f0;
-            --accent: rgb(109, 91, 208);
-            --accent-hover: rgb(109, 91, 208);
-            --shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.15);
-            --radius: 1.25rem;
+            --primary: #6D5BD0;
+            --dark: #5A48B8;
+            --light: #8877E8;
+            --soft: #DDD7F9;
+            --secondary: #F2EFFE;
+            --medium: #CBC2F0;
+            --subtle: #E9E6FA;
+            --deep: #4B3E9E;
+            --lilac: #B9AFF0;
+            --warm: #FFFAE6;
+            --text: #4b3e9e;
+            --bg: #dddddd;
+            --card-bg: #faf9ff;
+            --shadow: 0 2px 36px rgba(0, 0, 0, 0.08);
             --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
             --code-font: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
             --transition: 0.2s ease-in-out;
@@ -1147,20 +1142,29 @@ HTML;
 
         @media (prefers-color-scheme: dark) {
             :root {
-                --bg: #0f1117;
-                --card-bg: #1a1c23;
-                --text-primary: #edf2f7;
+                --primary: #8877E8;
+                --dark: #9D8FF0;
+                --light: #6D5BD0;
+                --soft: #4A3F7A;
+                --secondary: #2D2746;
+                --medium: #423B63;
+                --subtle: #5B4E9E;
+                --deep: #B9AFF0;
+                --lilac: #CFC6F0;
+                --warm: #F2E9FF;
+                --bg: #16141f !important;
+                --card-bg: #1e1b2b;
+                --text: #efedf7;
             }
         }
 
         body {
             background: var(--bg);
-            min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
             font-family: var(--font-family);
-            color: var(--text-primary);
+            color: var(--text);
             padding: 1.5rem;
             margin: 0;
             transition: background var(--transition), color var(--transition);
@@ -1170,11 +1174,9 @@ HTML;
             background: var(--card-bg);
             max-width: 600px;
             width: 100%;
-            border-radius: var(--radius);
             box-shadow: var(--shadow);
             padding: 2.5rem 2.5rem 2rem;
             transition: background var(--transition), box-shadow var(--transition);
-            border: 1px solid var(--border-color);
         }
 
         .error-header {
@@ -1190,7 +1192,7 @@ HTML;
             font-size: 4rem;
             font-weight: 700;
             line-height: 1;
-            color: var(--accent);
+            color: var(--dark);
             letter-spacing: -0.04em;
             font-family: var(--code-font);
         }
@@ -1202,7 +1204,7 @@ HTML;
             background: var(--bg);
             padding: 0.4rem 1rem;
             border-radius: 2rem;
-            border: 1px solid var(--border-color);
+            border: 1px solid var(--deep);
             white-space: nowrap;
         }
 
@@ -1254,7 +1256,6 @@ HTML;
         </div>
 
         <h1 class="error-message">Internal Server error</h1>
-        <p class="error-description">{$errorId}</p>
     </div>
 </body>
 </html>
