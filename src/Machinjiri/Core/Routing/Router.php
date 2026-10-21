@@ -664,15 +664,19 @@ class Router
         }
 
         :root {
-            --bg: #f7f9fc;
-            --card-bg: #ffffff;
-            --text-primary: #1a1a2e;
-            --text-muted: #4a4a6a;
-            --border-color: #e2e8f0;
-            --accent: #e68a5e;
-            --accent-hover: #d4794a;
-            --shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.15);
-            --radius: 1.25rem;
+            --primary: #6D5BD0;
+            --dark: #5A48B8;
+            --light: #8877E8;
+            --soft: #DDD7F9;
+            --secondary: #F2EFFE;
+            --medium: #CBC2F0;
+            --subtle: #E9E6FA;
+            --deep: #4B3E9E;
+            --lilac: #B9AFF0;
+            --warm: #FFFAE6;
+            --text: #4b3e9e;
+            --bg: #dddddd;
+            --card-bg: #faf9ff;
             --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
             --code-font: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
             --transition: 0.2s ease-in-out;
@@ -680,25 +684,29 @@ class Router
 
         @media (prefers-color-scheme: dark) {
             :root {
-                --bg: #0f1117;
-                --card-bg: #1a1c23;
-                --text-primary: #edf2f7;
-                --text-muted: #a0aec0;
-                --border-color: #2d3748;
-                --shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.6);
-                --accent: #f09b74;
-                --accent-hover: #e68a5e;
+                --primary: #8877E8;
+                --dark: #9D8FF0;
+                --light: #6D5BD0;
+                --soft: #4A3F7A;
+                --secondary: #2D2746;
+                --medium: #423B63;
+                --subtle: #5B4E9E;
+                --deep: #B9AFF0;
+                --lilac: #CFC6F0;
+                --warm: #F2E9FF;
+                --bg: #16141f !important;
+                --card-bg: #1e1b2b;
+                --text: #efedf7;
             }
         }
 
         body {
             background: var(--bg);
-            min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
             font-family: var(--font-family);
-            color: var(--text-primary);
+            color: var(--text);
             padding: 1.5rem;
             margin: 0;
             transition: background var(--transition), color var(--transition);
@@ -708,7 +716,7 @@ class Router
             background: var(--card-bg);
             max-width: 600px;
             width: 100%;
-            border-radius: var(--radius);
+            border: 1px solid var(--lilac);
             box-shadow: var(--shadow);
             padding: 2.5rem 2.5rem 2rem;
             transition: background var(--transition), box-shadow var(--transition);
@@ -739,7 +747,6 @@ class Router
             color: var(--text-muted);
             background: var(--bg);
             padding: 0.4rem 1rem;
-            border-radius: 2rem;
             border: 1px solid var(--border-color);
             white-space: nowrap;
         }
