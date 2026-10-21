@@ -24,7 +24,7 @@ use Mlangeni\Machinjiri\Core\FileSystem\Adapters\{LocalAdapter, FtpAdapter};
 use Mlangeni\Machinjiri\Core\Artisans\Caching\CacheManager;
 use Mlangeni\Machinjiri\Core\Transport\Mail\MailManager;
 use Mlangeni\Machinjiri\Core\Transport\SMS\SMSManager;
-use Mlangeni\Machinjiri\Core\Security\Tokens\CSRFToken;
+use Mlangeni\Machinjiri\Core\Security\Tokens\{CSRFToken, CookieOptions};
 use Mlangeni\Machinjiri\Core\Routing\RoutingConfig;
 use Mlangeni\Machinjiri\Core\Security\Hashing\Hasher;
 use Mlangeni\Machinjiri\Core\Security\Encryption\Bangwe;
@@ -165,7 +165,11 @@ class AppServiceProvider extends ServiceProvider
             return new CSRFToken(
                 $app->resolve(Session::class),
                 $app->resolve(Cookie::class),
-                env("CSRF_TOKEN_NAME", "csrf_token")
+                env("CSRF_TOKEN_NAME", "csrf_token"),
+                env("CSRF_COOKIE_NAME", "csrf_token"),
+                env("CSRF_TTL", 3600),
+                new CookieOptions(),
+                env("CSRF_MAX_FAILURES", 5)
             );
         });
 
