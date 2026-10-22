@@ -183,7 +183,7 @@ class AppServiceProvider extends ServiceProvider
         // -------------------- Security Services --------------------
         // Hasher provides hashing utilities (bcrypt, etc.) as a singleton.
         $this->singleton(Hasher::class, function ($app) {
-            return new Hasher();
+            return new Hasher($app, $app->resolve(Logger::class));
         });
 
         // Bangwe is the encryption service, requiring the application instance.
@@ -308,20 +308,25 @@ class AppServiceProvider extends ServiceProvider
         $configDir = $this->app->coreConfig;
 
         // If the config directory exists, load each configuration file.
-        if (is_dir($configDir)) {
-            $this->mergeConfigFrom($configDir . 'app.php', 'app');
-            $this->mergeConfigFrom($configDir . 'filesystem.php', 'filesystem');
-            $this->mergeConfigFrom($configDir . 'database.php', 'database');
-            $this->mergeConfigFrom($configDir . 'cache.php', 'cache');
-            $this->mergeConfigFrom($configDir . 'mail.php', 'mail');
-            $this->mergeConfigFrom($configDir . 'queue.php', 'queue');
-            $this->mergeConfigFrom($configDir . 'auth.php', 'auth');
-            $this->mergeConfigFrom($configDir . 'oauth.php', 'oauth');
-            $this->mergeConfigFrom($configDir . 'ldap.php', 'ldap');
-            $this->mergeConfigFrom($configDir . 'logger.php', 'logger');
-            $this->mergeConfigFrom($configDir . 'redis.php', 'redis');
-            $this->mergeConfigFrom($configDir . 'sms.php', 'sms');
-            $this->mergeConfigFrom($configDir . 'webhooks.php', 'webhooks');
+        try {
+            if (is_dir($configDir)) {
+                $this->mergeConfigFrom($configDir . 'app.php', 'app');
+                $this->mergeConfigFrom($configDir . 'filesystem.php', 'filesystem');
+                $this->mergeConfigFrom($configDir . 'database.php', 'database');
+                $this->mergeConfigFrom($configDir . 'cache.php', 'cache');
+                $this->mergeConfigFrom($configDir . 'mail.php', 'mail');
+                $this->mergeConfigFrom($configDir . 'queue.php', 'queue');
+                $this->mergeConfigFrom($configDir . 'auth.php', 'auth');
+                $this->mergeConfigFrom($configDir . 'oauth.php', 'oauth');
+                $this->mergeConfigFrom($configDir . 'ldap.php', 'ldap');
+                $this->mergeConfigFrom($configDir . 'logger.php', 'logger');
+                $this->mergeConfigFrom($configDir . 'redis.php', 'redis');
+                $this->mergeConfigFrom($configDir . 'sms.php', 'sms');
+                $this->mergeConfigFrom($configDir . 'webhooks.php', 'webhooks');
+                $this->mergeConfigFrom($configDir . 'hashing.php', 'hashing');
+            }
+        } catch (\Throwable $e) {
+            throw new MachinjiriException($e->getMessage(), $e->getCode(), $e);
         }
 
         $wsm = $this->app->resolve(WebhookSubscriptionManager::class);
