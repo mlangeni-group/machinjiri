@@ -1,241 +1,446 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Mlangeni\Machinjiri\Core\Debug;
 
 use Mlangeni\Machinjiri\Core\Container;
 use Mlangeni\Machinjiri\Core\Exceptions\ErrorHandler;
+use ReflectionFunction;
+use ReflectionObject;
+use DateTimeInterface;
+use Closure;
 
-/**
- * Dumper - Provides pretty variable dumping with optional termination.
- */
-class Dumper
+
+final class Dumper
 {
+    /** @var array{maxDepth:int,maxItems:int,sensitiveKeys:list<string>,redact:string} */
+    private static array $config = [
+        'maxDepth'      => 16,
+        'maxItems'      => 1000,
+        'sensitiveKeys' => [
+            'password', 'passwd', 'pwd',
+            'secret', 'token', 'api_key', 'apikey',
+            'access_token', 'refresh_token', 'private_key',
+            'authorization', 'auth',
+        ],
+        'redact'        => '***REDACTED***',
+    ];
+
     /**
-     * Dump one or more variables and optionally die.
+     * Optional exit handler. If null, `dd()` uses `exit()`.
+     * Tests can set this to a closure that throws instead of terminating.
      *
-     * @param mixed ...$args
-     * @return void
+     * @var null|callable(int):never
      */
-    public static function dump(...$args): void
+    public static $exitHandler = null;
+
+    /** @var array<int, true> Guard against circular object references. */
+    private static array $seenObjects = [];
+
+    /** @var bool Whether CSS has been emitted in this process. */
+    private static bool $stylesEmitted = false;
+
+
+    /**
+     * Merge user config over defaults.
+     *
+     * @param array<string,mixed> $config
+     */
+    public static function configure(array $config): void
+    {
+        self::$config = array_merge(self::$config, $config);
+    }
+
+    /**
+     * Dump one or more variables.
+     */
+    public static function dump(mixed ...$args): void
     {
         foreach ($args as $arg) {
-            static::output($arg);
+            self::output($arg);
         }
     }
 
     /**
      * Dump and die.
-     *
-     * @param mixed ...$args
-     * @return never
      */
-    public static function dd(...$args): never
+    public static function dd(mixed ...$args): never
     {
-        $app = Container::instancePresent() ? Container::getInstance() : null;
-        if ($app && !$app->isDevelopment()) ErrorHandler::renderGenericErrorPage();
-        
-        static::dump(...$args);
-        exit(1);
+        if (Container::instancePresent()) {
+            $app = Container::getInstance();
+            if (method_exists($app, 'isDevelopment') && !$app->isDevelopment()) {
+                ErrorHandler::renderGenericErrorPage();
+                self::terminate(1);
+            }
+        }
+
+        self::dump(...$args);
+        self::terminate(1);
     }
 
     /**
-     * Output a single variable with formatting.
-     *
-     * @param mixed $var
-     * @return void
+     * Format a variable to a string without emitting it.
+     * Useful for logging pipelines.
      */
-    protected static function output($var): void
+    public static function format(mixed $var, bool $html = false): string
     {
-        // Determine if we're in CLI or web context
-        if (php_sapi_name() === 'cli') {
-            static::cliDump($var);
+        ob_start();
+        self::$seenObjects = [];
+        if ($html) {
+            self::formatHtml($var, 0);
         } else {
-            static::htmlDump($var);
+            echo self::formatCli($var, 0);
         }
+        return (string) ob_get_clean();
     }
 
-    /**
-     * CLI output.
-     *
-     * @param mixed $var
-     * @return void
-     */
-    protected static function cliDump($var): void
+    private static function output(mixed $var): void
     {
-        if (is_string($var) || is_numeric($var)) {
-            echo $var . PHP_EOL;
-        } elseif (is_bool($var)) {
-            echo ($var ? 'true' : 'false') . PHP_EOL;
-        } elseif (is_null($var)) {
-            echo 'null' . PHP_EOL;
-        } elseif (is_array($var)) {
-            print_r($var);
-        } elseif (is_object($var)) {
-            echo get_class($var) . " Object\n";
-            print_r($var);
+        if (PHP_SAPI === 'cli') {
+            echo self::formatCli($var, 0) . PHP_EOL;
         } else {
-            var_dump($var);
+            self::htmlDump($var);
         }
     }
 
-    /**
-     * HTML output with styling.
-     *
-     * @param mixed $var
-     * @return void
-     */
-    protected static function htmlDump($var): void
+    private static function terminate(int $code): never
     {
-        static $hasStyles = false;
-
-        if (!$hasStyles) {
-            echo static::getStyles();
-            $hasStyles = true;
+        if (self::$exitHandler !== null) {
+            (self::$exitHandler)($code);
         }
-
-        echo '<div class="machinjiri-dump cozy-dump">';
-        echo '<pre>';
-        static::formatHtml($var);
-        echo '</pre>';
-        echo '</div>';
+        exit($code);
     }
 
-    /**
-     * Format a variable for HTML display.
-     *
-     * @param mixed $var
-     * @param int $depth
-     * @return void
-     */
-    protected static function formatHtml($var, int $depth = 0): void
+
+    private static function formatCli(mixed $var, int $depth): string
     {
         $indent = str_repeat('  ', $depth);
 
-        if (is_null($var)) {
+        if ($var === null)     return $indent . 'null';
+        if (is_bool($var))     return $indent . ($var ? 'true' : 'false');
+        if (is_int($var))      return $indent . (string) $var;
+        if (is_float($var))    return $indent . var_export($var, true);
+        if (is_string($var))   return $indent . '"' . $var . '"';
+
+        if (is_array($var)) {
+            if ($depth >= self::$config['maxDepth']) {
+                return $indent . 'array(...) [max depth]';
+            }
+            if (empty($var)) {
+                return $indent . 'array(0) []';
+            }
+            $out = $indent . 'array(' . count($var) . ") [\n";
+            $i = 0;
+            foreach ($var as $k => $v) {
+                if (++$i > self::$config['maxItems']) {
+                    $out .= $indent . '  ... (truncated)' . "\n";
+                    break;
+                }
+                $keyDisplay = is_string($k) ? '"' . $k . '"' : (string) $k;
+                if (is_string($k) && self::isSensitive($k)) {
+                    $keyDisplay = '"' . $k . '"';
+                    $v = self::$config['redact'];
+                }
+                $out .= $indent . '  ' . $keyDisplay . ' => '
+                      . ltrim(self::formatCli($v, $depth + 1)) . "\n";
+            }
+            return $out . $indent . ']';
+        }
+
+        if (is_object($var)) {
+            return self::formatObjectCli($var, $depth, $indent);
+        }
+
+        if (is_resource($var)) {
+            return $indent . 'resource(' . get_resource_type($var) . ')';
+        }
+
+        return $indent . gettype($var);
+    }
+
+    private static function formatObjectCli(object $var, int $depth, string $indent): string
+    {
+        if ($depth >= self::$config['maxDepth']) {
+            return $indent . 'object(' . get_class($var) . ') [max depth]';
+        }
+
+        $oid = spl_object_id($var);
+        if (isset(self::$seenObjects[$oid])) {
+            return $indent . 'object(' . get_class($var) . ') [circular ref]';
+        }
+        self::$seenObjects[$oid] = true;
+
+        try {
+            if ($var instanceof DateTimeInterface) {
+                return $indent . get_class($var)
+                    . '("' . $var->format('Y-m-d H:i:s.u T') . '")';
+            }
+            if ($var instanceof Closure) {
+                $r = new ReflectionFunction($var);
+                return $indent . 'Closure(' . $r->getFileName() . ':' . $r->getStartLine() . ')';
+            }
+            if (enum_exists(get_class($var))) {
+                return $indent . get_class($var) . '::' . $var->name;
+            }
+
+            $props = self::extractProperties($var);
+            if (empty($props)) {
+                return $indent . get_class($var) . ' {}';
+            }
+
+            $out = $indent . get_class($var) . " {\n";
+            $i = 0;
+            foreach ($props as $entry) {
+                if (++$i > self::$config['maxItems']) {
+                    $out .= $indent . '  ... (truncated)' . "\n";
+                    break;
+                }
+                [$name, $visibility, $value] = $entry;
+                $label = ($visibility !== 'public' ? $visibility . ' ' : '') . $name;
+                if (self::isSensitive($name)) {
+                    $value = self::$config['redact'];
+                }
+                $out .= $indent . '  ' . $label . ' => '
+                      . ltrim(self::formatCli($value, $depth + 1)) . "\n";
+            }
+            return $out . $indent . '}';
+        } finally {
+            unset(self::$seenObjects[$oid]);
+        }
+    }
+
+
+    private static function htmlDump(mixed $var): void
+    {
+        if (!self::$stylesEmitted) {
+            echo self::getStyles();
+            self::$stylesEmitted = true;
+        }
+
+        self::$seenObjects = [];
+        echo '<div class="machinjiri-dump cozy-dump"><pre>';
+        self::formatHtml($var, 0);
+        echo '</pre></div>' . "\n";
+    }
+
+    private static function formatHtml(mixed $var, int $depth = 0): void
+    {
+        $indent = str_repeat('  ', $depth);
+
+        if ($var === null) {
             echo '<span class="dump-null">null</span>';
         } elseif (is_bool($var)) {
             echo '<span class="dump-bool">' . ($var ? 'true' : 'false') . '</span>';
         } elseif (is_int($var)) {
             echo '<span class="dump-int">' . $var . '</span>';
         } elseif (is_float($var)) {
-            echo '<span class="dump-float">' . $var . '</span>';
+            echo '<span class="dump-float">' . self::e(var_export($var, true)) . '</span>';
         } elseif (is_string($var)) {
-            echo '<span class="dump-string">"' . htmlspecialchars($var) . '"</span>';
+            echo '<span class="dump-string">"' . self::e($var) . '"</span>';
         } elseif (is_array($var)) {
-            echo '<span class="dump-array">array</span> (' . count($var) . ') [';
-            if (empty($var)) {
-                echo ']';
-                return;
-            }
-            echo "\n";
-            foreach ($var as $key => $value) {
-                echo $indent . '  ';
-                if (is_string($key)) {
-                    echo '<span class="dump-key">"' . htmlspecialchars($key) . '"</span> => ';
-                } else {
-                    echo '<span class="dump-key">' . $key . '</span> => ';
-                }
-                static::formatHtml($value, $depth + 1);
-                echo "\n";
-            }
-            echo $indent . ']';
+            self::formatArrayHtml($var, $depth, $indent);
         } elseif (is_object($var)) {
-            $class = get_class($var);
-            echo '<span class="dump-object">' . $class . '</span> {';
-            $properties = get_object_vars($var);
-            if (empty($properties)) {
-                echo '}';
-                return;
-            }
-            echo "\n";
-            foreach ($properties as $key => $value) {
-                echo $indent . '  <span class="dump-property">' . htmlspecialchars($key) . '</span> => ';
-                static::formatHtml($value, $depth + 1);
-                echo "\n";
-            }
-            echo $indent . '}';
+            self::formatObjectHtml($var, $depth, $indent);
         } elseif (is_resource($var)) {
             echo '<span class="dump-resource">resource(' . get_resource_type($var) . ')</span>';
         } else {
-            var_dump($var);
+            echo '<span class="dump-unknown">' . self::e(gettype($var)) . '</span>';
         }
     }
 
+    private static function formatArrayHtml(array $var, int $depth, string $indent): void
+    {
+        echo '<span class="dump-array">array</span> (' . count($var) . ') [';
+        if (empty($var)) {
+            echo ']';
+            return;
+        }
+        if ($depth >= self::$config['maxDepth']) {
+            echo ' ... max depth ... ]';
+            return;
+        }
+        echo "\n";
+        $i = 0;
+        foreach ($var as $key => $value) {
+            if (++$i > self::$config['maxItems']) {
+                echo $indent . '  ... (truncated)' . "\n";
+                break;
+            }
+            echo $indent . '  ';
+            echo '<span class="dump-key">'
+                . (is_string($key) ? '"' . self::e($key) . '"' : (string) $key)
+                . '</span> => ';
+            if (is_string($key) && self::isSensitive($key)) {
+                echo '<span class="dump-string">"' . self::e((string) self::$config['redact']) . '"</span>';
+            } else {
+                self::formatHtml($value, $depth + 1);
+            }
+            echo "\n";
+        }
+        echo $indent . ']';
+    }
+
+    private static function formatObjectHtml(object $var, int $depth, string $indent): void
+    {
+        $class = get_class($var);
+        $oid = spl_object_id($var);
+
+        if ($depth >= self::$config['maxDepth']) {
+            echo '<span class="dump-object">' . self::e($class) . '</span> { ... max depth ... }';
+            return;
+        }
+        if (isset(self::$seenObjects[$oid])) {
+            echo '<span class="dump-object">' . self::e($class) . '</span> { <em>circular ref</em> }';
+            return;
+        }
+        self::$seenObjects[$oid] = true;
+
+        try {
+            if ($var instanceof DateTimeInterface) {
+                echo '<span class="dump-object">' . self::e($class) . '</span> ("'
+                    . self::e($var->format('Y-m-d H:i:s.u T')) . '")';
+                return;
+            }
+            if ($var instanceof Closure) {
+                $r = new ReflectionFunction($var);
+                echo '<span class="dump-object">Closure</span> ('
+                    . self::e($r->getFileName()) . ':' . (int) $r->getStartLine() . ')';
+                return;
+            }
+            if (enum_exists($class)) {
+                echo '<span class="dump-object">' . self::e($class) . '::' . self::e($var->name) . '</span>';
+                return;
+            }
+
+            echo '<span class="dump-object">' . self::e($class) . '</span> {';
+
+            $props = self::extractProperties($var);
+            if (empty($props)) {
+                echo '}';
+                return;
+            }
+
+            echo "\n";
+            $i = 0;
+            foreach ($props as $entry) {
+                if (++$i > self::$config['maxItems']) {
+                    echo $indent . '  ... (truncated)' . "\n";
+                    break;
+                }
+                [$name, $visibility, $value] = $entry;
+                $label = ($visibility !== 'public' ? $visibility . ' ' : '') . $name;
+
+                echo $indent . '  <span class="dump-property">' . self::e($label) . '</span> => ';
+                if (self::isSensitive($name)) {
+                    echo '<span class="dump-string">"' . self::e((string) self::$config['redact']) . '"</span>';
+                } else {
+                    self::formatHtml($value, $depth + 1);
+                }
+                echo "\n";
+            }
+            echo $indent . '}';
+        } finally {
+            unset(self::$seenObjects[$oid]);
+        }
+    }
+
+
     /**
+     * Extract object properties with visibility, including private/protected
+     * from ancestors, using reflection.
      *
-     * @return string
+     * @return list<array{string,string,mixed}> [name, visibility, value]
      */
-    protected static function getStyles(): string
+    private static function extractProperties(object $obj): array
+    {
+        $result = [];
+        $reflection = new ReflectionObject($obj);
+
+        do {
+            foreach ($reflection->getProperties() as $prop) {
+                $name = $prop->getName();
+                if (array_key_exists($name, $result)) {
+                    continue; // child class already exposes this name
+                }
+                if (!$prop->isInitialized($obj)) {
+                    $result[$name] = [$name, self::visibilityOf($prop), '<uninitialized>'];
+                    continue;
+                }
+                
+                $result[$name] = [
+                    $name,
+                    self::visibilityOf($prop),
+                    $prop->getValue($obj),
+                ];
+            }
+            $reflection = $reflection->getParentClass();
+        } while ($reflection !== false);
+
+        // Include dynamic public properties too.
+        foreach (get_object_vars($obj) as $name => $value) {
+            if (!isset($result[$name])) {
+                $result[$name] = [$name, 'public', $value];
+            }
+        }
+
+        return array_values($result);
+    }
+
+    private static function visibilityOf(\ReflectionProperty $prop): string
+    {
+        return $prop->isPrivate() ? 'private' : ($prop->isProtected() ? 'protected' : 'public');
+    }
+
+    private static function isSensitive(string $key): bool
+    {
+        $lower = strtolower($key);
+        foreach (self::$config['sensitiveKeys'] as $needle) {
+            if (str_contains($lower, $needle)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static function e(string $value): string
+    {
+        return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    }
+
+    private static function getStyles(): string
     {
         return <<<CSS
 <style>
-:root {
-    --bg: #dedede;
-    --color: #161922;
-    --primary: rgba(109, 91, 208, .10);
-    --int: #7F9EB5;
-    --radius-sm: 6px;
-    --border: #e6e8f1;
-    --dump-color-dark: #cccaca;
-    --font-weight: 700;
-}
-body {
-    background: var(--bg);
-    margin: 0;
-    padding: 0;
-}
 .machinjiri-dump.cozy-dump {
-    background: var(--dump-color-dark);
-    color: var(--color);
+    --md-bg: #dedede;
+    --md-color: #161922;
+    --md-int: #54748d;
+    --md-dark: #cccaca;
+    background: var(--md-dark);
+    color: var(--md-color);
     font-family: 'SF Mono', Monaco, Menlo, Consolas, 'Courier New', monospace;
     font-size: 14px;
     line-height: 1.6;
     padding: 1rem 1.2rem;
+    margin: .5rem 0;
     overflow-x: auto;
+    border-left: 4px solid rgb(52, 52, 56);
     backdrop-filter: blur(2px);
-    border-left: 4px solid rgb(52, 52, 56); 
 }
-
-.machinjiri-dump.cozy-dump pre {
-    margin: 0;
-    white-space: pre-wrap;
-    word-wrap: break-word;
-    font-family: inherit;
-}
-.dump-null {
-    color: #52413c;
-    font-weight: var(--font-weight);
-}
-.dump-bool {
-    color: #ce402e;
-    font-weight: var(--font-weight);
-}
-.dump-int {
-    color: #54748d;
-}
-.dump-float {
-    color: #54748d;
-}
-.dump-string {
-    color: #4a8139;
-}
-.dump-array {
-    color: #c29054;
-    font-weight: var(--font-weight);
-}
-.dump-object {
-    color: #7a2e31;
-    font-weight: var(--font-weight);
-}
-.dump-resource {
-    color: #9B6B9E;
-}
-.dump-key {
-    color: #132524b4;
-}
-.dump-property {
-    color: #88470e;
-}
+.machinjiri-dump.cozy-dump pre { margin: 0; white-space: pre-wrap; word-wrap: break-word; font-family: inherit; }
+.machinjiri-dump .dump-null     { color: #52413c; font-weight: 700; }
+.machinjiri-dump .dump-bool     { color: #ce402e; font-weight: 700; }
+.machinjiri-dump .dump-int,
+.machinjiri-dump .dump-float    { color: #54748d; }
+.machinjiri-dump .dump-string   { color: #4a8139; }
+.machinjiri-dump .dump-array    { color: #c29054; font-weight: 700; }
+.machinjiri-dump .dump-object   { color: #7a2e31; font-weight: 700; }
+.machinjiri-dump .dump-resource { color: #9B6B9E; }
+.machinjiri-dump .dump-key      { color: #132524b4; }
+.machinjiri-dump .dump-property { color: #88470e; }
+.machinjiri-dump .dump-unknown  { color: #888; }
+.machinjiri-dump em             { color: #b33; font-style: italic; }
 </style>
 CSS;
     }
