@@ -14,7 +14,7 @@ use Mlangeni\Machinjiri\Core\Exceptions\MachinjiriException;
 use Mlangeni\Machinjiri\Core\Database\Seeder\SeederManager;
 use Mlangeni\Machinjiri\Core\Database\Factory\FactoryManager;
 use Mlangeni\Machinjiri\Core\Database\Migrations\{MigrationCreator, MigrationHandler};
-use Mlangeni\Machinjiri\Facade\UI\Bootstrap\Misc\Keywords;
+use Mlangeni\Machinjiri\Core\Artisans\Helpers\Keywords;
 use MongoDB\Client as MongoClient;
 
 trait MigrationInstances
