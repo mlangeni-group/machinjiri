@@ -12,7 +12,8 @@ use Mlangeni\Machinjiri\Core\Artisans\Terminal\Commands\{
     WebhookCommand,
     Network,
     DatabaseCommands,
-    NotificationCommand
+    NotificationCommand,
+    CommandHelper
 };
 
 class Terminal extends Application
@@ -31,7 +32,7 @@ class Terminal extends Application
 
     public function __construct()
     {
-        parent::__construct('Machinjiri Terminal', '1.2.0');
+        parent::__construct('Machinjiri Terminal', CommandHelper::TERMINAL_VERSION);
         $this->registerCommands();
     }
 

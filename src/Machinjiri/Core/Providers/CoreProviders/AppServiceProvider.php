@@ -324,6 +324,7 @@ class AppServiceProvider extends ServiceProvider
                 $this->mergeConfigFrom($configDir . 'sms.php', 'sms');
                 $this->mergeConfigFrom($configDir . 'webhooks.php', 'webhooks');
                 $this->mergeConfigFrom($configDir . 'hashing.php', 'hashing');
+                $this->mergeConfigFrom($configDir . 'encryption.php', 'encryption');
             }
         } catch (\Throwable $e) {
             throw new MachinjiriException($e->getMessage(), $e->getCode(), $e);
