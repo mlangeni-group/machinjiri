@@ -18,6 +18,9 @@ use Mlangeni\Machinjiri\Core\Artisans\Terminal\Commands\{
 
 class Terminal extends Application
 {
+    /** @var TERMINAL_VERSION */
+    public const TERMINAL_VERSION = "2.0";
+    
     protected $commandClasses = [
         App::class,
         PHPServerCommands::class,
@@ -32,7 +35,7 @@ class Terminal extends Application
 
     public function __construct()
     {
-        parent::__construct('Machinjiri Terminal', CommandHelper::TERMINAL_VERSION);
+        parent::__construct('Machinjiri Terminal', self::TERMINAL_VERSION);
         $this->registerCommands();
     }
 

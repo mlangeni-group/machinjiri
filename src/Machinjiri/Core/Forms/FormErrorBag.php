@@ -10,7 +10,7 @@ class FormErrorBag
         $this->errors[$field][] = $message;
     }
 
-    public function has(string $field = null): bool
+    public function has(?string $field = null): bool
     {
         if ($field === null) {
             return !empty($this->errors);

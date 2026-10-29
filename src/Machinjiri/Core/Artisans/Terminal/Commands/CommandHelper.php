@@ -2,6 +2,7 @@
 
 namespace Mlangeni\Machinjiri\Core\Artisans\Terminal\Commands;
 
+use Mlangeni\Machinjiri\Core\Artisans\Terminal\Terminal;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
@@ -12,9 +13,6 @@ use Mlangeni\Machinjiri\Core\Artisans\Events\Factory as EventListener;
 
 trait CommandHelper
 {
-    /** @var TERMINAL_VERSION */
-    public const TERMINAL_VERSION = "2.0";
-
     /**
      * Execute a command with standardised setup and exception handling.
      *
@@ -31,7 +29,7 @@ trait CommandHelper
         string $title,
         callable $handler
     ): int {
-        $version = self::TERMINAL_VERSION;
+        $version = Terminal::TERMINAL_VERSION;
         $ss = new SymfonyStyle($input, $output);
         $ss->title("Machinjiri Terminal v{$version} => [{$title}]");
         $context = ['module' => $title, 'handler' => $handler];

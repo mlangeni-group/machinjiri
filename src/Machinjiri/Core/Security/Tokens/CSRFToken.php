@@ -76,8 +76,9 @@ final class CSRFToken implements CSRFTokenInterface
     // Validation
     // ---------------------------------------------------------------------
 
-    public function validateToken(string $token): bool
+    public function validateToken(?string $token = null): bool
     {
+        if ($token === null) return false;
         if (!$this->isWellFormed($token)) {
             $this->recordFailure();
             return false;
