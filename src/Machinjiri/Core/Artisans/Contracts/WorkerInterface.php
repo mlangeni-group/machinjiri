@@ -2,10 +2,6 @@
 
 namespace Mlangeni\Machinjiri\Core\Artisans\Contracts;
 
-use Mlangeni\Machinjiri\Core\Container;
-use Mlangeni\Machinjiri\Core\Exceptions\MachinjiriException;
-use Mlangeni\Machinjiri\Core\Artisans\Events\EventListener;
-
 /**
  * Worker Interface
  */

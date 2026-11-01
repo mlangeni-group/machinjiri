@@ -2,10 +2,11 @@
 
 namespace Mlangeni\Machinjiri\Core\Artisans\Contracts;
 
-use Mlangeni\Machinjiri\Core\Container;
-use Mlangeni\Machinjiri\Core\Exceptions\MachinjiriException;
 use Mlangeni\Machinjiri\Core\Artisans\Events\EventListener;
 use Mlangeni\Machinjiri\Core\Artisans\Logging\LoggerFactory;
+use Mlangeni\Machinjiri\Core\Container;
+use Mlangeni\Machinjiri\Core\Exceptions\ContractsException\JobException;
+use Mlangeni\Machinjiri\Core\Exceptions\ContractsException\ProcessorException;
 
 /**
  * Worker – supports heartbeat callbacks for supervisor monitoring.
@@ -158,7 +159,7 @@ class BaseWorker implements WorkerInterface
         
         return $this->status;
     }
-    
+     
     /**
      * Process a single job
      */
@@ -172,26 +173,32 @@ class BaseWorker implements WorkerInterface
 
         try {
             // Check if max attempts exceeded (after increment)
-            if ($job->getAttempts() >= $job->getMaxAttempts()) {
+            if ($job->getAttempts() == $job->getMaxAttempts()) {
                 $this->processor->markAsFailed(
                     $job, 
-                    new MachinjiriException("Job {$job->getId()} has reached max attempts of {$job->getMaxAttempts()}.")
+                    new JobException("Job {$job->getId()} has reached max attempts of {$job->getMaxAttempts()}.")
                 );
                 $this->status['failed']++;
                 return false;
             }
+
             
             $result = $this->processor->process($job);
+
             $this->status['processed']++;
             $this->status['last_job_at'] = time();
             $this->processor->handleSuccess($job, $result);
+
             return true;
         } catch (\Throwable $e) {
-            $exception = $e instanceof MachinjiriException ? $e : new MachinjiriException($e->getMessage(), 60002, $e);
             $this->status['failed']++;
-            $this->processor->handleFailure($job, $exception);
+            $this->processor->handleFailure($job, new JobException(
+                $e->getMessage(),
+                $e->getCode(),
+                $e
+            ));
+            return false;
         }
-        return false;
     }
     
     /**
@@ -314,10 +321,10 @@ class BaseWorker implements WorkerInterface
             return true;
         } catch (\Throwable $e) {
 
-            if ($e instanceof MachinjiriException) {
+            if ($e instanceof ProcessorException) {
                 $this->processor->handleFailure($job, $e);
             } else {
-                $this->processor->handleFailure($job, new MachinjiriException(
+                $this->processor->handleFailure($job, new ProcessorException(
                     $e->getMessage(),
                     60002,
                     $e
@@ -362,7 +369,7 @@ class BaseWorker implements WorkerInterface
             } else {
                 // Timeout - kill child
                 posix_kill($pid, SIGKILL);
-                throw new MachinjiriException("Job timed out after {$timeout} seconds");
+                throw new ProcessorException("Job timed out after {$timeout} seconds");
             }
         } else {
             // Child process

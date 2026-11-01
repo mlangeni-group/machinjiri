@@ -3,9 +3,8 @@
 namespace Mlangeni\Machinjiri\Core\Artisans\Contracts\Drivers;
 
 use Mlangeni\Machinjiri\Core\Artisans\Contracts\{BaseQueue, JobInterface};
-use Mlangeni\Machinjiri\Core\Exceptions\MachinjiriException;
-use Mlangeni\Machinjiri\Core\Artisans\Logging\LoggerFactory;
 use Mlangeni\Machinjiri\Core\Container;
+use Mlangeni\Machinjiri\Core\Exceptions\ContractsException\DriverException;
 
 /**
  * Sync Queue Driver
@@ -89,8 +88,8 @@ class SyncQueue extends BaseQueue
                 'job_name' => $job->getName(),
                 'queue' => $queue,
             ]);
-        } catch (MachinjiriException $e) {
-            $job->failed(new MachinjiriException($e->getMessage()));
+        } catch (\Throwable $e) {
+            $job->failed(new DriverException($e->getMessage()));
             
             // Move to failed
             $this->markAsFailed($job->getId(), $e->getMessage());

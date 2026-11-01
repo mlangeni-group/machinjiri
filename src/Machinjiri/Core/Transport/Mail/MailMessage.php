@@ -149,6 +149,11 @@ class MailMessage implements \JsonSerializable
             'priority' => $this->priority,
         ];
     }
+
+    public function toArray(): array
+    {
+        return $this->jsonSerialize();
+    }
     
     public static function fromArray(array $data): self
     {

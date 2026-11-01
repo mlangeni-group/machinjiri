@@ -15,6 +15,7 @@ use Mlangeni\Machinjiri\Core\Artisans\Logging\{Logger, LoggerFactory};
 use Mlangeni\Machinjiri\Core\Database\DatabaseConnection;
 use Mlangeni\Machinjiri\Core\Artisans\Helpers\DotEnv;
 use Mlangeni\Machinjiri\Core\Container;
+use Mlangeni\Machinjiri\Core\Exceptions\ContractsException\TerminalException;
 
 class SignalManager
 {
@@ -84,11 +85,11 @@ trait QueueCommandHelper
     private function validateQueueConfig(array $config): array
     {
         if (!isset($config['drivers']) || !is_array($config['drivers'])) {
-            throw new MachinjiriException('Queue configuration must contain a "drivers" array.');
+            throw new TerminalException('Queue configuration must contain a "drivers" array.');
         }
         foreach ($config['drivers'] as $name => $cfg) {
             if (!is_array($cfg)) {
-                throw new MachinjiriException("Driver configuration for '{$name}' must be an array.");
+                throw new TerminalException("Driver configuration for '{$name}' must be an array.");
             }
         }
         return $config;
@@ -98,7 +99,7 @@ trait QueueCommandHelper
     {
         $container = $this->artisanContainer();
         if (!$container->bound('queue.worker')) {
-            throw new MachinjiriException("Queue Worker is not bound in container. Please ensure the QueueServiceProvider is loaded or run 'php artisan queue:init'.");
+            throw new TerminalException("Queue Worker is not bound in container. Please ensure the QueueServiceProvider is loaded or run 'php artisan queue:init'.");
         }
         return $container->resolve('queue.worker');
     }
@@ -107,7 +108,7 @@ trait QueueCommandHelper
     {
         $container = $this->artisanContainer();
         if (!$container->bound('queue')) {
-            throw new MachinjiriException("Queue is not bound in Container. Please ensure the QueueServiceProvider is loaded or run 'php artisan queue:init'");
+            throw new TerminalException("Queue is not bound in Container. Please ensure the QueueServiceProvider is loaded or run 'php artisan queue:init'");
         }
         return $container->resolve('queue');
     }
@@ -116,7 +117,7 @@ trait QueueCommandHelper
     {
         $container = $this->artisanContainer();
         if (!$container->bound('queue.processor')) {
-            throw new MachinjiriException("Queue processor is not registered in the container. Please ensure the QueueServiceProvider is loaded or run 'php artisan queue:init'.");
+            throw new TerminalException("Queue processor is not registered in the container. Please ensure the QueueServiceProvider is loaded or run 'php artisan queue:init'.");
         }
         return $container->resolve('queue.processor');
     }
@@ -233,7 +234,7 @@ trait QueueCommandHelper
     {
         $container = $this->artisanContainer();
         if (!$container->bound("db.kernel.connection")) {
-            throw new MachinjiriException("Database not bound in container");
+            throw new TerminalException("Database not bound in container");
         }
         return $container->resolve("db.kernel.connection");
     }

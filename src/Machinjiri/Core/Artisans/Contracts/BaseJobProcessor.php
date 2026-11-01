@@ -3,10 +3,11 @@
 namespace Mlangeni\Machinjiri\Core\Artisans\Contracts;
 
 use Mlangeni\Machinjiri\Core\Container;
-use Mlangeni\Machinjiri\Core\Exceptions\MachinjiriException;
+use Mlangeni\Machinjiri\Core\Exceptions\ContractsException\ProcessorException;
 use Mlangeni\Machinjiri\Core\Artisans\Events\EventListener;
 use Mlangeni\Machinjiri\Core\Artisans\Contracts\QueueInterface;
 use Mlangeni\Machinjiri\Core\Artisans\Logging\{LoggerFactory, Logger};
+use Mlangeni\Machinjiri\Core\Exceptions\ContractsException\JobException;
 
 /**
  * Abstract Job Processor
@@ -62,14 +63,14 @@ abstract class BaseJobProcessor implements JobProcessorInterface
             ]);
             return $result;
         } catch (\Throwable $e) {
-            throw new MachinjiriException("Job {$job->getName()} failed: {$e->getMessage()}", 60001, $e);
+            throw new JobException("Job {$job->getName()} failed: {$e->getMessage()}", 60001, $e);
         }
     }
     
     /**
      * Handle job failure
      */
-    public function handleFailure(JobInterface $job, MachinjiriException $exception): void
+    public function handleFailure(JobInterface $job, JobException $exception): void
     {   
         $this->events->trigger('job.failed', [
             'job_id' => $job->getId(),
@@ -184,7 +185,7 @@ abstract class BaseJobProcessor implements JobProcessorInterface
         ]);
 
         if (!method_exists($this->getQueue(), 'markAsCompleted')) {
-            throw new MachinjiriException("Method markAsFailed not found in default Queue Driver");
+            throw new ProcessorException("Method markAsCompleted not found in default Queue Driver");
         }
 
         $this->getQueue()->markAsCompleted($job->getId(), $job->getPayload());
@@ -195,7 +196,7 @@ abstract class BaseJobProcessor implements JobProcessorInterface
     /**
      * Mark job as failed
      */
-    public function markAsFailed(JobInterface $job, MachinjiriException $exception): void
+    public function markAsFailed(JobInterface $job, JobException $exception): void
     {
         $this->events->trigger('job.marked_failed', [
             'job_id' => $job->getId(),
@@ -204,13 +205,13 @@ abstract class BaseJobProcessor implements JobProcessorInterface
         ]);
 
         if (!method_exists($this->getQueue(), 'markAsFailed')) {
-            throw new MachinjiriException("Method markAsFailed not found in default Queue Driver");
+            throw new ProcessorException("Method markAsFailed not found in default Queue Driver");
         }
 
         $this->getQueue()->markAsFailed($job->getId(), $exception->getMessage());
 
         if (!method_exists($job, 'failed')) {
-            throw new MachinjiriException("Method failed not found in default Queue Driver");
+            throw new ProcessorException("Method [failed] not found in default Queue Driver");
         }
 
         $job->failed($exception);
@@ -234,7 +235,7 @@ abstract class BaseJobProcessor implements JobProcessorInterface
     private function getQueue(): ?QueueInterface
     {
         if (!$this->app->bound('queue')) {
-            throw new MachinjiriException("Queue service is not bound in the container.", 60002);
+            throw new ProcessorException("Queue service is not bound in the container.", 60002);
         }
         return $this->app->resolve('queue');
     }

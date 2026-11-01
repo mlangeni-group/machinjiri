@@ -2,10 +2,9 @@
 
 namespace Mlangeni\Machinjiri\Core\Artisans\Contracts\Drivers;
 
-use Mlangeni\Machinjiri\Core\Artisans\Contracts\{BaseQueue, JobInterface};
-use Mlangeni\Machinjiri\Core\Exceptions\MachinjiriException;
 use Mlangeni\Machinjiri\Core\Artisans\Adapters\Redis\RedisAdapter;
-use Mlangeni\Machinjiri\Core\Container;
+use Mlangeni\Machinjiri\Core\Artisans\Contracts\{BaseQueue, JobInterface};
+use Mlangeni\Machinjiri\Core\Exceptions\ContractsException\DriverException;
 
 /**
  * Redis Queue Driver (Predis based)
@@ -260,7 +259,7 @@ class RedisQueue extends BaseQueue
     {
         try {
             return $this->redis->ping() === 'PONG';
-        } catch (MachinjiriException $e) {
+        } catch (DriverException $e) {
             return false;
         }
     }

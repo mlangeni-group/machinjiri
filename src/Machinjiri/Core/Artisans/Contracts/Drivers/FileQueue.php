@@ -3,9 +3,8 @@
 namespace Mlangeni\Machinjiri\Core\Artisans\Contracts\Drivers;
 
 use Mlangeni\Machinjiri\Core\Artisans\Contracts\{BaseQueue, JobInterface};
-use Mlangeni\Machinjiri\Core\Exceptions\MachinjiriException;
-use Mlangeni\Machinjiri\Core\Artisans\Logging\LoggerFactory;
 use Mlangeni\Machinjiri\Core\Container;
+use Mlangeni\Machinjiri\Core\Exceptions\ContractsException\DriverException;
 
 /**
  * File Queue Driver
@@ -71,7 +70,7 @@ class FileQueue extends BaseQueue
         ];
         
         if (file_put_contents($filepath, json_encode($data)) === false) {
-            throw new MachinjiriException('Failed to write job to file');
+            throw new DriverException('Failed to write job to file');
         }
         
         $this->events->trigger('queue.job.pushed', [
@@ -475,6 +474,7 @@ class FileQueue extends BaseQueue
     public function markAsFailed(string $jobId, string $errorMessage): void 
     {
         $pattern = $this->storagePath . 'processing/*_' . $jobId . '.json';
+        
         $files = glob($pattern);
         
         if (empty($files)) {

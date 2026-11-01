@@ -3,11 +3,10 @@
 namespace Mlangeni\Machinjiri\Core\Artisans\Contracts\Drivers;
 
 use Mlangeni\Machinjiri\Core\Artisans\Contracts\{BaseQueue, JobInterface};
-use Mlangeni\Machinjiri\Core\Database\DatabaseConnection;
-use Mlangeni\Machinjiri\Core\Database\Builders\QueryBuilder;
-use Mlangeni\Machinjiri\Core\Exceptions\MachinjiriException;
-use Mlangeni\Machinjiri\Core\Artisans\Logging\LoggerFactory;
 use Mlangeni\Machinjiri\Core\Container;
+use Mlangeni\Machinjiri\Core\Database\Builders\QueryBuilder;
+use Mlangeni\Machinjiri\Core\Database\DatabaseConnection;
+use Mlangeni\Machinjiri\Core\Exceptions\ContractsException\DriverException;
 
 /**
  * Database Queue Driver
@@ -99,7 +98,7 @@ class DatabaseQueue extends BaseQueue
         $jobData = json_decode($job['payload'], true);
         
         if (!$jobData) {
-            throw new MachinjiriException('Invalid job payload');
+            throw new DriverException('Invalid job payload');
         }
         
         $jobClass = $jobData['name'] ?? '';
@@ -218,7 +217,7 @@ class DatabaseQueue extends BaseQueue
             // Test database connection
             $this->queryBuilder->select(['1'])->first();
             return true;
-        } catch (MachinjiriException $e) {
+        } catch (DriverException $e) {
             return false;
         }
     }
@@ -302,28 +301,32 @@ class DatabaseQueue extends BaseQueue
         if (!$job || $job === null) {
             return;
         }
-        
-        // Move to failed jobs table
-        $failedQuery = new QueryBuilder($this->config['failed_table'] ?? 'failed_jobs');
 
-        // check if job already exists in failed
-        $exists = $failedQuery->select()->where('job_id', '=', $job['job_id'])->first();
-        if ($exists === null || !$exists) {
-            $result = $failedQuery->insert([
-                'queue' => $job['queue'],
-                'job_id' => $job['job_id'],
-                'payload' => $job['payload'],
-                'exception' => $error,
-                'failed_at' => time(),
-            ])->execute();
-    
-            if ($result['lastInsertId'] || $result['lastInsertId'] > 0) {
-                // Remove from jobs table
-                $this->queryBuilder
-                    ->delete()
-                    ->where('job_id', '=', $jobId)
-                    ->execute();
+        try {
+            // Move to failed jobs table
+            $failedQuery = new QueryBuilder($this->config['failed_table'] ?? 'failed_jobs');
+
+            // check if job already exists in failed
+            $exists = $failedQuery->select()->where('job_id', '=', $job['job_id'])->first();
+
+            if ($exists === null || !$exists) {
+                $result = $failedQuery->insert([
+                    'queue' => $job['queue'],
+                    'job_id' => $job['job_id'],
+                    'payload' => $job['payload'],
+                    'exception' => $error,
+                    'failed_at' => time(),
+                ])->execute();
             }
+
+            // Remove from jobs table
+            $this->queryBuilder
+                ->delete()
+                ->where('job_id', '=', $jobId)
+                ->execute();
+            
+        } catch (\Throwable $exception) {
+            dd("Failed to mark job as failed: {$exception->getMessage()}");
         }
         
     }

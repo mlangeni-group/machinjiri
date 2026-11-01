@@ -3,8 +3,7 @@
 namespace Mlangeni\Machinjiri\Core\Artisans\Contracts;
 
 use Mlangeni\Machinjiri\Core\Container;
-use Mlangeni\Machinjiri\Core\Exceptions\MachinjiriException;
-use \SensitiveParameter;  
+use Mlangeni\Machinjiri\Core\Exceptions\ContractsException\JobException;
 use Mlangeni\Machinjiri\Core\Artisans\Logging\{LoggerFactory, Logger};
 use Mlangeni\Machinjiri\Core\Components\UUID\ULID\UlidComponent;
 use Mlangeni\Machinjiri\Core\Security\Encryption\Cipher;
@@ -182,7 +181,7 @@ abstract class BaseJob implements JobInterface
     /**
      * Called when the job fails
      */
-    public function failed(MachinjiriException $exception): void
+    public function failed(JobException $exception): void
     {
         $this->getLogger()->error('Job permanently failed', [
             'name'       => $this->getName(),
@@ -224,7 +223,7 @@ abstract class BaseJob implements JobInterface
     public static function unserialize(array $data, ?Container $app = null): self
     {
         if (!$app) {
-            throw new MachinjiriException('Container instance is required to unserialize a job', 60010);
+            throw new JobException('Container instance is required to unserialize a job', 60010);
         }
 
         $compressPayload = $data['compressPayload'] ?? false;
