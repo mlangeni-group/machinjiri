@@ -2,27 +2,24 @@
 
 Machinjiri is a modular, production-ready PHP framework for building maintainable web applications, APIs, and internal tools with speed and clarity. It combines a resilient service container, expressive routing, database tooling, security helpers, queue processing, task scheduling, and modern developer tooling in a single cohesive platform.
 
-Current stable version: `2.2.9`
+Current stable version: `2.3.0`
 
-## What’s New in 2.2.9
+## What’s New in 2.3.0
 
-Machinjiri `2.2.9` focuses on production-readiness, cleaner application startup, and broader infrastructure support. The release strengthens the framework across the core container, CLI tooling, queue system, task scheduler, authentication integrations, and event-driven services.
+Machinjiri `2.3.0` focuses on more reliable queue processing, stronger security APIs, and a leaner framework surface. The release also updates terminal tooling and aligns the documentation with APIs and features currently included in the package.
 
 Highlights from this release include:
 
-- Updated the framework metadata and package versioning so the project is aligned with the current `2.2.9` release
-- Confirmed compatibility with **PHP 8.3+**, including modern PHP 8.4 runtime environments
-- Improved application bootstrapping, container binding, and service provider registration for more predictable dependency resolution and startup flow
-- Expanded the Artisan CLI and code-generation ecosystem for faster scaffolding, job creation, scheduler administration, and project maintenance
-- Strengthened task scheduling with persisted task state, cron triggers, retries, concurrency protection, priority ordering, and health checks
-- Improved the queue and worker pipeline for more reliable background processing, delayed jobs, and operational control
-- Added richer webhook management with provider subscriptions, signature verification, queued/sync delivery, and idempotency safeguards
-- Extended notification delivery across mail, SMS, database, and webhook channels with configurable transport and dispatch control
-- Improved enterprise integrations for LDAP, Redis, FTP, and filesystem/cloud adapters for distributed deployments
-- Refined request lifecycle management, middleware flow, HTTP utilities, and response handling for more robust web and API orchestration
-- Improved exception handling, logging, profiling, and debugging layers to separate diagnostics, rendering, and rate-limited reporting
+- Refined queue job contracts, drivers, retries, and worker commands, with more specific exceptions for queue, job, driver, processor, and terminal failures
+- Added configurable password policies and validation, with password hashing and verification through the security APIs
+- Expanded password hashing with bcrypt and Argon2 options, optional pre-hashing and pepper support, and verify-and-rehash handling
+- Made encryption configurable by cipher, including authenticated AES-GCM support and validated IV/tag settings
+- Strengthened CSRF token handling with expiration, timing-safe checks, configurable cookie options, and a double-submit cookie flow
+- Updated terminal command handling and form error access for clearer behavior
+- Moved PHP keyword lists to `Core\Artisans\Helpers\Keywords`
+- Removed the bundled Bootstrap UI components and the framework-provided testing helpers; use your preferred UI library and PHPUnit directly
 
-This release keeps Machinjiri focused on maintainability, modularity, and developer productivity without sacrificing operational safety or enterprise integration depth.
+Machinjiri requires **PHP 8.3 or higher**. See the examples below for the current security, queue, and testing APIs.
 
 ## Table of Contents
 
@@ -119,10 +116,10 @@ Machinjiri is designed to accelerate web development with:
 - **Session Management**: Secure session handling with configurable drivers
 - **OAuth Integration**: Third-party authentication (Google, GitHub, etc.)
 - **Cookie Management**: Secure cookie handling with encryption options
-- **Password Hashing**: Built-in password hashing with bcrypt/Argon2
-- **CSRF Token Protection**: Automatic CSRF token generation and validation
+- **Password Hashing**: Configurable bcrypt/Argon2 hashing, password policies, and verify-and-rehash support
+- **CSRF Token Protection**: Expiring tokens, validation, and configurable cookie options
 - **SQL Injection Prevention**: Parameterized queries via query builder
-- **Encryption**: AES encryption/decryption for sensitive data
+- **Encryption**: Configurable AES encryption, including authenticated AES-GCM
 - **JWT Tokens**: JSON Web Token support for API authentication
 
 ### Forms & Validation
@@ -131,7 +128,7 @@ Machinjiri is designed to accelerate web development with:
 - **Rule Builder**: Fluent interface for building complex validation rules
 - **Password Rules**: Special validation rules for password strength
 - **Error Messages**: Custom error messages and localization support
-- **Form Handler**: Server-side form processing and CSRF protection
+- **CSRF Helpers**: Token field generation and request validation
 
 ### Queues & Jobs
 
@@ -169,11 +166,7 @@ Machinjiri is designed to accelerate web development with:
 
 ### Components
 
-- **Component Factory**: Create UI components programmatically
-- **Pre-built Components**: Alert, Button, Card, Form, Input, Modal, Nav, ProgressBar
-- **Component Traits**: Reusable component functionality
-- **Attributes Management**: Flexible attribute handling for HTML elements
-- **CSS Classes Builder**: Dynamic CSS class generation
+The former bundled Bootstrap UI component package has been removed. Build UI with your application templates or a frontend library of your choice.
 
 ### HTTP Layer
 
@@ -650,25 +643,50 @@ $user = $oauth->getUserInfo($token);
 **Password Security:**
 
 ```php
-use Mlangeni\Machinjiri\Core\Forms\Password;
+use Mlangeni\Machinjiri\Core\Security\Hashing\Hasher;
+use Mlangeni\Machinjiri\Core\Security\Password\Password;
+use Mlangeni\Machinjiri\Core\Security\Password\PasswordPolicy;
 
-// Hash password
-$hashed = Password::hash('secret123');
+$policy = new PasswordPolicy(
+    minLength: 12,
+    requireSpecial: false,
+);
 
-// Verify password
-if (Password::verify('secret123', $hashed)) {
-    // Password is correct
+$password = new Password($plainText, $policy);
+if (!$password->validate()) {
+    $errors = $password->errors();
+    // Return validation errors to the user.
 }
+
+$hash = $password->hash();
+
+// Verify at login and persist a replacement hash when the configured
+// hashing algorithm or cost has changed.
+$hasher = new Hasher();
+$hasher->verifyAndRehash($candidate, $storedHash, function (string $newHash) use ($user): void {
+    $user->update(['password' => $newHash]);
+});
 ```
 
 **CSRF Protection:**
 
+The controller base class provides `csrfField()` and `verifyCsrf()` helpers. The token service also supports expiring tokens and the double-submit cookie pattern:
+
 ```php
-// Automatically handled in forms
-<form method="POST" action="/users">
-    <input type="hidden" name="_token" value="<%= csrf_token() %>">
-    <!-- form fields -->
-</form>
+use Mlangeni\Machinjiri\Core\Security\Tokens\CSRFToken;
+
+// Resolve the configured singleton from the application container.
+$csrf = $app->resolve(CSRFToken::class);
+$field = $csrf->csrfField(); // Escaped hidden input, ready for a form.
+
+$token = $csrf->getToken();
+if ($csrf->validateToken($submittedToken)) {
+    // Continue processing the request.
+}
+
+// For clients using a double-submit cookie, issue and validate both values.
+$cookieToken = $csrf->generateTokenWithCookie();
+$validCookieToken = $csrf->validateTokenWithCookie($submittedCookieToken);
 ```
 
 **Encryption:**
@@ -676,9 +694,29 @@ if (Password::verify('secret123', $hashed)) {
 ```php
 use Mlangeni\Machinjiri\Core\Security\Encryption\Cipher;
 
-$encrypter = new Cipher($key);
-$encrypted = $encrypter->encrypt($data);
-$decrypted = $encrypter->decrypt($encrypted);
+// Configure the cipher under the "encryption" key loaded by the application.
+// AES-GCM authenticates ciphertext as well as encrypting it.
+$cipher = new Cipher();
+$encrypted = $cipher->encrypt($plainText);
+$decrypted = $cipher->decrypt($encrypted);
+```
+
+Set the default cipher and secret in the application configuration; do not hard-code secrets in source:
+
+```php
+// config/core/encryption.php
+return [
+    'default' => 'aes-256-gcm',
+    'ciphers' => [
+        'aes-256-gcm' => [
+            'cipher' => 'aes-256-gcm',
+            'secret' => env('APP_KEY'),
+            'iv_size' => 12,
+            'tag_size' => 16,
+            'aead' => true,
+        ],
+    ],
+];
 ```
 
 ### LDAP
@@ -824,21 +862,31 @@ php artisan make:job SendWelcomeEmail
 // app/Jobs/SendWelcomeEmail.php
 namespace App\Jobs;
 
-use Mlangeni\Machinjiri\Core\Artisans\Contracts\JobInterface;
+use Mlangeni\Machinjiri\Core\Artisans\Contracts\BaseJob;
+use Mlangeni\Machinjiri\Core\Container;
+use Mlangeni\Machinjiri\Core\Exceptions\ContractsException\JobException;
 
-class SendWelcomeEmail implements JobInterface
+class SendWelcomeEmail extends BaseJob
 {
-    public $data;
-    
-    public function __construct($userId)
+    public function __construct(Container $app, int $userId)
     {
-        $this->data = ['user_id' => $userId];
+        parent::__construct($app, ['user_id' => $userId], [
+            'queue' => 'default',
+            'maxAttempts' => 3,
+            'timeout' => 60,
+        ]);
     }
-    
-    public function handle()
+
+    public function handle(): void
     {
-        $user = User::find($this->data['user_id']);
-        Mail::to($user->email)->send(new WelcomeEmail($user));
+        $userId = $this->getPayload()['user_id'];
+        // Resolve services and perform the work using the application container.
+    }
+
+    public function failed(JobException $exception): void
+    {
+        parent::failed($exception);
+        // Add application-specific failure handling if needed.
     }
 }
 ```
@@ -846,17 +894,30 @@ class SendWelcomeEmail implements JobInterface
 **Dispatch Job:**
 
 ```php
-// In a controller or callback
-dispatch(new SendWelcomeEmail($user->id));
+use Mlangeni\Machinjiri\Core\Artisans\Contracts\BaseJobDispatcher;
 
-// Or queue for later
-dispatch(new SendWelcomeEmail($user->id))->onQueue('default');
+// Inject or resolve the configured dispatcher and application container.
+$dispatcher = $app->resolve(BaseJobDispatcher::class);
+$jobId = $dispatcher->dispatch(new SendWelcomeEmail($app, $userId));
+
+// Explicit queue or delayed dispatch:
+$jobId = $dispatcher->dispatchToQueue(
+    new SendWelcomeEmail($app, $userId),
+    'emails',
+);
+$delayedJobId = $dispatcher->dispatchWithDelay(
+    new SendWelcomeEmail($app, $userId),
+    300,
+);
 ```
 
 **Process Jobs:**
 
 ```bash
-php artisan queue:work
+php artisan queue:work --queue=default --sleep=3 --memory=128 --timeout=60
+# Limit the number of jobs or stop when the queue is empty:
+php artisan queue:work --max-jobs=100
+php artisan queue:work --stop-on-empty
 ```
 
 ### Task Scheduler
@@ -891,45 +952,6 @@ $queuedResponse = $smsManager->send($message, true);
 ```
 
 The manager returns a structured response, logs delivery failures, and supports custom transports through the transport registry.
-
-### Components
-
-Create reusable UI components programmatically.
-
-**Available Components:**
-
-```php
-use Mlangeni\Machinjiri\Components\Alert;
-use Mlangeni\Machinjiri\Components\Button;
-use Mlangeni\Machinjiri\Components\Card;
-use Mlangeni\Machinjiri\Components\Form;
-use Mlangeni\Machinjiri\Components\Input;
-use Mlangeni\Machinjiri\Components\Modal;
-use Mlangeni\Machinjiri\Components\Nav;
-use Mlangeni\Machinjiri\Components\ProgressBar;
-
-// Alert component
-$alert = new Alert('Success!', 'success');
-echo $alert->render();
-
-// Button component
-$button = new Button('Click Me', 'btn-primary');
-echo $button->render();
-
-// Form component
-$form = new Form('POST', '/submit');
-$form->addField('email', 'email');
-$form->addField('password', 'password');
-echo $form->render();
-
-// Input component
-$input = new Input('email', 'user@example.com');
-echo $input->render();
-
-// Card component
-$card = new Card('Title', 'Content');
-echo $card->render();
-```
 
 ## ⚙️ Configuration
 
@@ -1305,52 +1327,27 @@ php artisan view:cache               # Cache views
 
 ## Testing
 
-Machinjiri ships with an upgraded PHPUnit base test case that mirrors the framework’s newer feature set and makes application-level testing easier without forcing a full app scaffold into every repo.
-
-### Base test case
+Machinjiri uses PHPUnit for its test suite. The framework-specific `Mlangeni\Machinjiri\Testing` base case, traits, fakes, and assertions are no longer included; extend PHPUnit's test case and use PHPUnit or Mockery directly.
 
 ```php
 <?php
 
-namespace Mlangeni\Machinjiri\Tests\Unit;
+namespace Tests\Unit;
 
-use Mlangeni\Machinjiri\Testing\TestCase;
+use PHPUnit\Framework\TestCase;
+use Mlangeni\Machinjiri\Core\Security\Password\PasswordPolicy;
 
 class ExampleTest extends TestCase
 {
-    public function testAuthenticatedUserFlow(): void
+    public function testPasswordPolicyDefaults(): void
     {
-        $user = new class {
-            public string $email = 'tester@example.com';
-            public string $name = 'Tester';
-        };
+        $policy = new PasswordPolicy();
 
-        $this->actingAs($user);
-        $this->assertAuthenticated();
-
-        $this->withSession([
-            'flash' => 'Welcome back!',
-        ]);
-
-        $this->assertSessionHas('flash', 'Welcome back!');
+        self::assertSame(8, $policy->minLength);
+        self::assertTrue($policy->requireSpecial);
     }
 }
 ```
-
-### Available test concerns
-
-The upgraded suite exposes helpers for:
-
-- application bootstrapping and app access
-- HTTP request dispatching and response assertions
-- database assertions with SQLite in-memory testing
-- session manipulation and assertions
-- authentication helpers such as `actingAs()`, `be()`, `assertAuthenticated()` and `assertGuest()`
-- console command execution via `artisan()`
-- email, queue and event fakes
-- factory creation and mocking helpers
-- time freezing and faker-based data generation
-- snapshot assertions
 
 ### Running the suite
 
@@ -1365,12 +1362,7 @@ vendor/bin/phpunit tests/Unit/ExampleTest.php
 vendor/bin/phpunit --coverage-html coverage
 ```
 
-### Best practices
-
-- use `RefreshDatabase` when you want a fresh SQLite transaction per test
-- use `withoutMiddleware()` when you need to bypass framework middleware in a request test
-- use `artisan()` for command-level validation in console-driven features
-- prefer the built-in fake helpers for mail, queue and events instead of hitting real infrastructure
+Use PHPUnit's standard setup and assertions for application tests. Configure any database, mail, or queue test doubles in your project rather than relying on framework-provided testing fakes.
 
 ## Contributing
 
@@ -1435,11 +1427,10 @@ This project is licensed under a **proprietary license** - see the [LICENSE](LIC
 ## Authors
 
 - **Precious Lyson** - [GitHub](https://github.com/precious-lyson) | [Email](mailto:precious.lyson@gmail.com)
-- **Mlangeni Group** - [Website](https://mlangeni.com)
+- **Mlangeni Group** - [Website](https://www.facebook.com/profile.php?id=61590389113242)
 
 ## Acknowledgments
 
-- Inspired by Laravel's elegant syntax and structure
 - Built on modern PHP 8.4+ features
 - Community contributions and feedback
 

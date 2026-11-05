@@ -1,6 +1,6 @@
 # Machinjiri Framework Improvements
 
-This document summarizes the major upgrades delivered in the current Machinjiri framework release, version `2.2.6`.
+This document summarizes the major upgrades delivered in the current Machinjiri framework release, version `2.3.0`.
 
 ## Overview
 
@@ -9,11 +9,15 @@ Machinjiri continues to evolve as a modular PHP framework aimed at speed, reliab
 ## Release Highlights
 
 - Added support for modern PHP runtimes, including **PHP 8.3+** and PHP 8.4 compatibility
-- Standardized framework metadata and package versioning around the current `2.2.6` release
+- Standardized framework metadata and package versioning around the current `2.3.0` release
 - Improved application bootstrap flow and container initialization for cleaner startup and more predictable service resolution
 - Strengthened service provider registration and binding behavior for modular dependency injection and lazy loading
 - Expanded Artisan commands and generator workflows for faster project scaffolding, maintenance, and developer tasks
 - Improved queue workers and job execution behavior for more resilient background processing and retry handling
+- Refined queue job contracts and drivers, worker controls, retry handling, and queue-specific exceptions
+- Added configurable password policies, stronger hashing options, and verify-and-rehash support
+- Added configurable encryption ciphers, including authenticated AES-GCM, and strengthened CSRF token validation and cookie handling
+- Removed bundled Bootstrap UI components and framework-specific testing helpers
 - Strengthened the task scheduler with persistent state, cron scheduling, overlap protection, retry logic, and operational health checks
 - Added more complete webhook management with provider subscriptions, HMAC verification, safe async/sync routing, and idempotency support
 - Extended notification routing across mail, SMS, database, and webhooks with configurable channel management
@@ -23,7 +27,7 @@ Machinjiri continues to evolve as a modular PHP framework aimed at speed, reliab
 ## Platform and Compatibility Upgrades
 
 - Added support for modern PHP runtimes, including **PHP 8.3+** and PHP 8.4 compatibility
-- Standardized framework metadata and package versioning around the current `2.2.6` release
+- Standardized framework metadata and package versioning around the current `2.3.0` release
 - Improved application bootstrap flow and container bootstrapping for better startup consistency
 - Tightened integration with Symfony Console, Filesystem, and Process components for CLI and generator tooling
 - Improved provider registration and service binding behavior for cleaner dependency injection flows
@@ -59,9 +63,9 @@ Machinjiri continues to evolve as a modular PHP framework aimed at speed, reliab
 
 - Added stronger session and cookie handling with configurable security controls
 - Improved OAuth integration and third-party authentication workflows
-- Expanded password hashing support with modern algorithms and secure defaults
-- Improved CSRF protection and security-oriented form handling
-- Added encryption, JWT support, and secure token utilities for API and user workflows
+- Expanded password hashing support with configurable bcrypt/Argon2 algorithms, password policies, optional pre-hashing and pepper support, and verify-and-rehash handling
+- Improved CSRF protection with expiring tokens, timing-safe validation, configurable cookie options, and double-submit cookie support
+- Added configurable encryption ciphers, including authenticated AES-GCM, alongside JWT support and secure token utilities
 - Improved LDAP integration and authentication support for enterprise directory environments
 - Expanded validation and form-request capabilities, including file uploads and rule builders
 
@@ -77,18 +81,17 @@ Machinjiri continues to evolve as a modular PHP framework aimed at speed, reliab
 ## Queues, Jobs, and Task Scheduling
 
 - Improved job queue infrastructure with more reliable persistence and worker behavior
+- Refined job and queue contracts, retry behavior, worker options, and operational exceptions
 - Added stronger task scheduler support for cron-based execution, retries, and collision protection
 - Expanded task metadata handling for priority ordering, execution history, and schedule health checks
 - Added queue and scheduler commands for managing jobs and tasks directly from the CLI
 - Improved queue event handling and operational observability for background processing
 
-## Views, UI Components, and Developer Experience
+## Views and Developer Experience
 
 - Expanded template inheritance and layout-driven view rendering
 - Improved partial includes, shared view state, and loop directives for cleaner templates
-- Added reusable UI components with dynamic attribute handling and CSS class generation
-- Included common building blocks such as alerts, buttons, cards, forms, modals, navbars, and progress indicators
-- Added a component factory for more programmatic UI assembly and maintainable front-end code
+- Removed the bundled Bootstrap UI components so applications can choose their own frontend library
 - Improved asset and frontend-integration helpers for a smoother developer workflow
 
 ## Logging, Errors, and Diagnostics
@@ -110,14 +113,12 @@ Machinjiri continues to evolve as a modular PHP framework aimed at speed, reliab
 
 ## Testing and Quality Improvements
 
-- Strengthened framework testing support with reusable assertions, mocks, and test-case patterns
-- Improved database test reset workflows for isolated test execution
-- Added Faker integration for realistic fixture generation
-- Improved support for parallel test execution and modern code-quality tooling
+- Removed the framework-provided testing base case, traits, fakes, and assertions; use PHPUnit and project-owned test helpers directly
+- Retained PHPUnit, Mockery, Faker, and ParaTest as development dependencies for framework development
 - Continued to align the framework with clean, maintainable PHP development practices
 
 ## Summary
 
-The `2.2.6` release focuses on making Machinjiri more robust, modular, and developer-friendly. The framework now provides a stronger foundation for building secure, scalable web applications with modern PHP practices, richer enterprise integrations, dependable background processing, and production-oriented operational tooling.
+The `2.3.0` release focuses on making Machinjiri more robust, modular, and developer-friendly. The framework now provides a stronger foundation for building secure, scalable web applications with modern PHP practices, richer enterprise integrations, dependable background processing, and production-oriented operational tooling.
 
 The result is a platform that is easier to bootstrap, easier to extend, and better suited to real-world application deployment across web, API, and internal-system workloads.
