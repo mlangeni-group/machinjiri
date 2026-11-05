@@ -213,6 +213,19 @@ The former bundled Bootstrap UI component package has been removed. Build UI wit
 
 ## Installation
 
+### Install using Installer
+Download and install the Installer globally using composer in terminal
+
+```bash
+composer global require machinjiri/installer
+```
+Once the Installer is installed. Scaffold your project by running the create command:
+
+```bash
+machinjiri create my-app
+```
+Follow the prompts to create your application
+
 ### Install with Composer
 
 Install Machinjiri as a dependency in your project:
