@@ -4,31 +4,168 @@ Machinjiri is a modular, production-ready PHP framework for building maintainabl
 
 Current stable version: `2.3.0`
 
-## What’s New in 2.3.0
-
-Machinjiri `2.3.0` focuses on more reliable queue processing, stronger security APIs, and a leaner framework surface. The release also updates terminal tooling and aligns the documentation with APIs and features currently included in the package.
-
-Highlights from this release include:
-
-- Refined queue job contracts, drivers, retries, and worker commands, with more specific exceptions for queue, job, driver, processor, and terminal failures
-- Added configurable password policies and validation, with password hashing and verification through the security APIs
-- Expanded password hashing with bcrypt and Argon2 options, optional pre-hashing and pepper support, and verify-and-rehash handling
-- Made encryption configurable by cipher, including authenticated AES-GCM support and validated IV/tag settings
-- Strengthened CSRF token handling with expiration, timing-safe checks, configurable cookie options, and a double-submit cookie flow
-- Updated terminal command handling and form error access for clearer behavior
-- Moved PHP keyword lists to `Core\Artisans\Helpers\Keywords`
-- Removed the bundled Bootstrap UI components and the framework-provided testing helpers; use your preferred UI library and PHPUnit directly
-
 Machinjiri requires **PHP 8.3 or higher**. See the examples below for the current security, queue, and testing APIs.
+
+## Installation
+
+### Install using Installer
+Download and install the Installer globally using composer in terminal
+
+```bash
+composer global require machinjiri/installer
+```
+Once the Installer is installed. Scaffold your project by running the create command:
+
+```bash
+machinjiri create my-app
+```
+Follow the prompts to create your application
+
+### Install with Composer
+
+Install Machinjiri as a dependency in your project:
+
+```bash
+composer require machinjiri/framework
+```
+
+### Local development
+
+To run the framework repository locally:
+
+```bash
+git clone https://github.com/mlangeni-group/machinjiri.git
+cd machinjiri
+composer install
+```
+
+### Recommended setup
+
+- Copy `.env.example` to `.env`
+- Set `APP_KEY`, database, and mail credentials
+- Run `composer test` to verify the installation
+
+## Quick Start
+
+### 1. Create Your First Route
+
+```php
+// routes/web.php
+use Mlangeni\Machinjiri\Core\Routing\Router;
+
+Router::get('/', function() {
+    return 'Welcome to Machinjiri!';
+});
+
+Router::get('/hello/{name}', function($name) {
+    return "Hello, {$name}!";
+}, 'greeting');
+```
+
+### 2. Create a Controller
+
+```php
+// app/Controllers/HomeController.php
+namespace App\Controllers;
+
+class HomeController
+{
+    public function index()
+    {
+        return view('home', ['title' => 'Home Page']);
+    }
+}
+```
+
+### 3. Create a View
+
+```html
+<!-- resources/views/home.view.php -->
+<% extend('layouts.app') %>
+
+<% section('content') %>
+    <div class="container">
+        <h1><%= $title %></h1>
+        <p>Welcome to your Machinjiri application!</p>
+    </div>
+<% endsection %>
+```
+
+### 4. Connect Route to Controller
+
+```php
+// routes/web.php
+Router::get('/', 'HomeController@index', 'home');
+```
+
+### 5. Start Development Server
+
+```bash
+php artisan run:dev
+```
+
+Visit `http://localhost:3000` in your browser.
+
+## Project Structure
+
+```
+your-project/
+├── app/
+│   ├── Controllers/          # Application controllers
+│   ├── Jobs/                 # Application Jobs
+│   ├── Middleware/           # Custom middleware classes
+│   ├── Queue/                # Queue Drivers
+│   │     └── Drivers/        # Driver Files (Custom Queue Drivers)
+│   ├── Models/               # Data models
+│   ├── Tasks/                # Scheduled Tasks
+│   ├── Webhooks/             # Webhooks
+│   ├── Providers/            # Service providers
+│   └── Exceptions/           # Custom exceptions
+├── bootstrap/
+│   └── app.php               # App Bootstrap
+├── config/
+│   ├── core/                 # Application configuration
+│   │   ├── app.php        
+│   │   ├── cache.php 
+│   │   └── auth.php
+│   └── services
+│       └── providers.php     # Service providers list
+├── database/
+│   ├── migrations/           # Database migration files
+│   ├── seeders/              # Database seeder classes
+│   ├── factories/            # Database factory classes
+│   └── cache-prefetch-db.php # Prefetch Database Cache file 
+├── resources/
+│   └── views/                # View templates
+│       ├── layouts/          # Layout templates
+│       ├── partials/         # Reusable view fragments
+│       └── pages/            # Page-specific views
+├── routes/
+│   └── web.php               # Web application routes
+├── storage/
+│   ├── cache/                # Cached data files
+│   ├── cookies/              # Cookie storage
+│   ├── logs/                 # Application logs
+│   └── sessions/             # Session files
+├── public/
+│   ├── src/
+│   │   ├── css/              # Stylesheets
+│   │   ├── js/               # JavaScript files
+│   │   └── images/           # Image assets
+│   ├── .htaccess             # .htaccess config file
+│   └── index.php             # Application entry point
+├── vendor/                   # Composer dependencies
+├── .env                      # Environment configuration
+├── artisan                   # Console application
+├── composer.json             # Project dependencies
+└── phpunit.xml               # PHPUnit configuration
+```
 
 ## Table of Contents
 
 - [Introduction](#introduction)
 - [Features](#features)
 - [System Requirements](#system-requirements)
-- [Installation](#installation)
-- [Quick Start](#quick-start)
-- [Project Structure](#project-structure)
 - [Core Components](#core-components)
   - [Routing](#routing-system)
   - [Views & Templates](#view-engine)
@@ -210,161 +347,6 @@ The former bundled Bootstrap UI component package has been removed. Build UI wit
   - ldap (optional, for LDAP authentication and directory integration)
 - **Composer**: 2.0 or higher
 - **Database**: MySQL 5.7+, PostgreSQL 10+, or SQLite 3+
-
-## Installation
-
-### Install using Installer
-Download and install the Installer globally using composer in terminal
-
-```bash
-composer global require machinjiri/installer
-```
-Once the Installer is installed. Scaffold your project by running the create command:
-
-```bash
-machinjiri create my-app
-```
-Follow the prompts to create your application
-
-### Install with Composer
-
-Install Machinjiri as a dependency in your project:
-
-```bash
-composer require machinjiri/framework
-```
-
-### Local development
-
-To run the framework repository locally:
-
-```bash
-git clone https://github.com/mlangeni-group/machinjiri.git
-cd machinjiri
-composer install
-```
-
-### Recommended setup
-
-- Copy `.env.example` to `.env`
-- Set `APP_KEY`, database, and mail credentials
-- Run `composer test` to verify the installation
-
-## Quick Start
-
-### 1. Create Your First Route
-
-```php
-// routes/web.php
-use Mlangeni\Machinjiri\Core\Routing\Router;
-
-Router::get('/', function() {
-    return 'Welcome to Machinjiri!';
-});
-
-Router::get('/hello/{name}', function($name) {
-    return "Hello, {$name}!";
-}, 'greeting');
-```
-
-### 2. Create a Controller
-
-```php
-// app/Controllers/HomeController.php
-namespace App\Controllers;
-
-class HomeController
-{
-    public function index()
-    {
-        return view('home', ['title' => 'Home Page']);
-    }
-}
-```
-
-### 3. Create a View
-
-```html
-<!-- resources/views/home.view.php -->
-<% extend('layouts.app') %>
-
-<% section('content') %>
-    <div class="container">
-        <h1><%= $title %></h1>
-        <p>Welcome to your Machinjiri application!</p>
-    </div>
-<% endsection %>
-```
-
-### 4. Connect Route to Controller
-
-```php
-// routes/web.php
-Router::get('/', 'HomeController@index', 'home');
-```
-
-### 5. Start Development Server
-
-```bash
-php artisan run:dev
-```
-
-Visit `http://localhost:3000` in your browser.
-
-## Project Structure
-
-```
-your-project/
-├── app/
-│   ├── Controllers/          # Application controllers
-│   ├── Jobs/                 # Application Jobs
-│   ├── Middleware/           # Custom middleware classes
-│   ├── Queue/                # Queue Drivers
-│   │     └── Drivers/        # Driver Files (Custom Queue Drivers)
-│   ├── Models/               # Data models
-│   ├── Tasks/                # Scheduled Tasks
-│   ├── Webhooks/             # Webhooks
-│   ├── Providers/            # Service providers
-│   └── Exceptions/           # Custom exceptions
-├── bootstrap/
-│   └── app.php               # App Bootstrap
-├── config/
-│   ├── core/                 # Application configuration
-│   │   ├── app.php        
-│   │   ├── cache.php 
-│   │   └── auth.php
-│   └── services
-│       └── providers.php     # Service providers list
-├── database/
-│   ├── migrations/           # Database migration files
-│   ├── seeders/              # Database seeder classes
-│   ├── factories/            # Database factory classes
-│   └── cache-prefetch-db.php # Prefetch Database Cache file 
-├── resources/
-│   └── views/                # View templates
-│       ├── layouts/          # Layout templates
-│       ├── partials/         # Reusable view fragments
-│       └── pages/            # Page-specific views
-├── routes/
-│   └── web.php               # Web application routes
-├── storage/
-│   ├── cache/                # Cached data files
-│   ├── cookies/              # Cookie storage
-│   ├── logs/                 # Application logs
-│   └── sessions/             # Session files
-├── public/
-│   ├── src/
-│   │   ├── css/              # Stylesheets
-│   │   ├── js/               # JavaScript files
-│   │   └── images/           # Image assets
-│   ├── .htaccess             # .htaccess config file
-│   └── index.php             # Application entry point
-├── vendor/                   # Composer dependencies
-├── .env                      # Environment configuration
-├── artisan                   # Console application
-├── composer.json             # Project dependencies
-└── phpunit.xml               # PHPUnit configuration
-```
 
 ## Core Components
 
@@ -1424,6 +1406,21 @@ composer cs-check
 # Fix code standards
 composer cs-fix
 ```
+
+## What’s New in 2.3.0
+
+Machinjiri `2.3.0` focuses on more reliable queue processing, stronger security APIs, and a leaner framework surface. The release also updates terminal tooling and aligns the documentation with APIs and features currently included in the package.
+
+Highlights from this release include:
+
+- Refined queue job contracts, drivers, retries, and worker commands, with more specific exceptions for queue, job, driver, processor, and terminal failures
+- Added configurable password policies and validation, with password hashing and verification through the security APIs
+- Expanded password hashing with bcrypt and Argon2 options, optional pre-hashing and pepper support, and verify-and-rehash handling
+- Made encryption configurable by cipher, including authenticated AES-GCM support and validated IV/tag settings
+- Strengthened CSRF token handling with expiration, timing-safe checks, configurable cookie options, and a double-submit cookie flow
+- Updated terminal command handling and form error access for clearer behavior
+- Moved PHP keyword lists to `Core\Artisans\Helpers\Keywords`
+- Removed the bundled Bootstrap UI components and the framework-provided testing helpers; use your preferred UI library and PHPUnit directly
 
 ## License
 
