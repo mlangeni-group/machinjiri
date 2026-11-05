@@ -3,9 +3,6 @@
 namespace Mlangeni\Machinjiri\Core\Artisans\Contracts\Drivers;
 
 use Mlangeni\Machinjiri\Core\Artisans\Contracts\{BaseQueue, JobInterface};
-use Mlangeni\Machinjiri\Core\Exceptions\MachinjiriException;
-use Mlangeni\Machinjiri\Core\Artisans\Logging\LoggerFactory;
-use Mlangeni\Machinjiri\Core\Container;
 
 /**
  * Memory Queue Driver

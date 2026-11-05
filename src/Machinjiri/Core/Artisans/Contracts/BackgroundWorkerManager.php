@@ -27,9 +27,9 @@ class BackgroundWorkerManager
     public function __construct(Container $app)
     {
         $this->app = $app;
-        $this->logger = LoggerFactory::system('queue-worker-supervisor', "queue");
+        $this->logger = LoggerFactory::system('queue-supervisor', "queue");
         $this->basePath = $this->detectBasePath();
-        $this->storagePath = $this->basePath . '/storage/framework/queue';
+        $this->storagePath = $this->basePath . '/storage/queue';
         
         if (!is_dir($this->storagePath)) {
             $oldUmask = umask(0077);

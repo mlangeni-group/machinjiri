@@ -3,7 +3,7 @@
 namespace Mlangeni\Machinjiri\Core\Artisans\Contracts;
 
 use Mlangeni\Machinjiri\Core\Container;
-use Mlangeni\Machinjiri\Core\Exceptions\MachinjiriException;
+use Mlangeni\Machinjiri\Core\Exceptions\ContractsException\JobException;
 
 /**
  * Job Interface
@@ -70,7 +70,7 @@ interface JobInterface
     /**
      * Called when the job fails
      */
-    public function failed(MachinjiriException $exception): void;
+    public function failed(JobException $exception): void;
 
     /**
      * Serialize the job for storage

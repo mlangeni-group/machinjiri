@@ -2,8 +2,8 @@
 
 namespace Mlangeni\Machinjiri\Core\Artisans\Contracts;
 
-use Mlangeni\Machinjiri\Core\Container;
-use Mlangeni\Machinjiri\Core\Exceptions\MachinjiriException;
+use Mlangeni\Machinjiri\Core\Artisans\Contracts\JobInterface;
+use Mlangeni\Machinjiri\Core\Exceptions\ContractsException\JobException;
 
 /**
  * Job Processor Interface
@@ -18,7 +18,7 @@ interface JobProcessorInterface
     /**
      * Handle job failure
      */
-    public function handleFailure(JobInterface $job, MachinjiriException $exception): void;
+    public function handleFailure(JobInterface $job, JobException $exception): void;
     
     /**
      * Handle job success
@@ -33,7 +33,7 @@ interface JobProcessorInterface
     /**
      * Mark job as failed
      */
-    public function markAsFailed(JobInterface $job, MachinjiriException $exception): void;
+    public function markAsFailed(JobInterface $job, JobException $exception): void;
     
     /**
      * Retry a failed job

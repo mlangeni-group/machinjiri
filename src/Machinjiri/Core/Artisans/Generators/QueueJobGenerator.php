@@ -73,7 +73,7 @@ class QueueJobGenerator
      */
     public function __construct(Container $container)
     {
-        $this->appBasePath = rtrim($container->getRootPath(), DIRECTORY_SEPARATOR);
+        $this->appBasePath = realpath(rtrim($container->getRootPath(), DIRECTORY_SEPARATOR));
         $this->srcPath = $this->appBasePath . '/src/Machinjiri/';
         $this->jobsPath = $this->appBasePath . '/app/Jobs/';
         $this->queuesPath = $this->appBasePath . '/app/Queue/Drivers/';
@@ -246,7 +246,7 @@ namespace App\Jobs;
 use Mlangeni\Machinjiri\Core\Artisans\Contracts\BaseJob;
 use Mlangeni\Machinjiri\Core\Artisans\Logging\LoggerFactory;
 use Mlangeni\Machinjiri\Core\Artisans\Events\EventListener;
-use Mlangeni\Machinjiri\Core\Exceptions\MachinjiriException;
+use Mlangeni\Machinjiri\Core\Exceptions\ContractsException\JobException;
 
 /**
  * {$name} Job
@@ -295,7 +295,7 @@ class {$name}Job extends BaseJob
     /**
      * Handle job failure
      */
-    public function failed(MachinjiriException \$exception): void
+    public function failed(JobException \$exception): void
     {
         // Log the failure
         LoggerFactory::system("queue-worker", "queue", false)
@@ -338,7 +338,7 @@ PHP;
 namespace App\Jobs;
 
 use Mlangeni\Machinjiri\Core\Artisans\Contracts\BaseJob;
-use Mlangeni\Machinjiri\Core\Exceptions\MachinjiriException;
+use Mlangeni\Machinjiri\Core\Exceptions\ContractsException\JobException;
 use Mlangeni\Machinjiri\Core\Database\Builders\QueryBuilder;
 use Mlangeni\Machinjiri\Core\Artisans\Logging\LoggerFactory;
 
@@ -532,7 +532,7 @@ class {$name}Job extends BaseJob
     /**
      * Handle job failure
      */
-    public function failed(MachinjiriException \$exception): void
+    public function failed(JobException \$exception): void
     {
         // Log failure with model context
         LoggerFactory::system("queue-worker", "queue", false)
@@ -719,7 +719,7 @@ use Mlangeni\Machinjiri\Core\Artisans\Contracts\BaseQueue;
 use Mlangeni\Machinjiri\Core\Artisans\Contracts\JobInterface;
 use Mlangeni\Machinjiri\Core\Database\DatabaseConnection;
 use Mlangeni\Machinjiri\Core\Database\Builders\QueryBuilder;
-use Mlangeni\Machinjiri\Core\Exceptions\MachinjiriException;
+use Mlangeni\Machinjiri\Core\Exceptions\ContractsException\DriverException;
 
 /**
  * {$name} Queue Driver

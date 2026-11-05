@@ -3,7 +3,8 @@
 namespace Mlangeni\Machinjiri\Core\Artisans\Contracts;
 
 use Mlangeni\Machinjiri\Core\Container;
-use Mlangeni\Machinjiri\Core\Exceptions\MachinjiriException;
+use Mlangeni\Machinjiri\Core\Exceptions\ContractsException\JobException;
+use Mlangeni\Machinjiri\Core\Exceptions\ContractsException\QueueException;
 use Mlangeni\Machinjiri\Core\Artisans\Events\EventListener;
 use Mlangeni\Machinjiri\Core\Artisans\Logging\LoggerFactory;
 
@@ -43,7 +44,7 @@ class BaseJobDispatcher implements JobDispatcherInterface
     {
         // Validate queue name before using it
         if (!$this->isValidQueueName($queue)) {
-            throw new MachinjiriException("Invalid queue name: {$queue}", 60020);
+            throw new QueueException("Invalid queue name: {$queue}", 60020);
         }
         
         $jobId = $this->queue->push($job, $queue, $job->getDelay());
@@ -78,12 +79,12 @@ class BaseJobDispatcher implements JobDispatcherInterface
     public function dispatchNow(JobInterface $job): mixed
     {
         if (!$job instanceof JobInterface) {
-            throw new MachinjiriException('Invalid job instance', 60011);
+            throw new JobException('Invalid job instance', 60011);
         }
         
         $processor = $this->app->resolve('queue.processor');
         if (!$processor) {
-            throw new MachinjiriException('Job processor not configured', 60012);
+            throw new JobException('Job processor not configured', 60012);
         }
         
         $this->eventListener->trigger('job.processing', [
@@ -96,11 +97,11 @@ class BaseJobDispatcher implements JobDispatcherInterface
             $result = $processor->process($job);
             $processor->handleSuccess($job, $result);
             return $result;
-        } catch (MachinjiriException $e) {
+        } catch (JobException $e) {
             $processor->handleFailure($job, $e);
             throw $e;
         } catch (\Throwable $e) {
-            $exception = new MachinjiriException('Sync job execution failed: ' . $e->getMessage(), 60013, $e);
+            $exception = new JobException('Sync job execution failed: ' . $e->getMessage(), 60013, $e);
             $processor->handleFailure($job, $exception);
             throw $exception;
         }
@@ -112,14 +113,14 @@ class BaseJobDispatcher implements JobDispatcherInterface
     public function dispatchBulk(array $jobs): array
     {
         if (empty($jobs)) {
-            throw new MachinjiriException('Cannot dispatch empty jobs array', 60014);
+            throw new JobException('Cannot dispatch empty jobs array', 60014);
         }
         
         $jobIds = [];
         
         foreach ($jobs as $job) {
             if (!($job instanceof JobInterface)) {
-                throw new MachinjiriException('All items must implement JobInterface', 60015);
+                throw new JobException('All items must implement JobInterface', 60015);
             }
             $jobIds[] = $this->dispatch($job);
         }
