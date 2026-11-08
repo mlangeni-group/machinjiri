@@ -65,12 +65,12 @@ class FileUpload
     /**
      * Upload a single file.
      *
-     * @param \UploadedFile $file
+     * @param UploadedFile $file
      * @param string|null $subDir Subdirectory under baseDir
      * @return string The stored path (relative to disk root)
      * @throws MachinjiriException
      */
-    public function upload(\UploadedFile $file, ?string $subDir = ''): string
+    public function upload(UploadedFile $file, ?string $subDir = ''): string
     {
         if ($file->getError() !== UPLOAD_ERR_OK) {
             throw new MachinjiriException("File upload error code: " . $file->getError());
@@ -102,7 +102,7 @@ class FileUpload
         return $targetPath;
     }
 
-    private function generateFileName(\UploadedFile $file, string $ext): string
+    private function generateFileName(UploadedFile $file, string $ext): string
     {
         if ($this->nameCallback === 'original') {
             $name = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);

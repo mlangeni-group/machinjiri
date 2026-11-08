@@ -19,7 +19,7 @@ class FileSystemManager
     /**
      * @throws MachinjiriException
      */
-    public function disk(?string $name = null): Filesystem
+    public function disk(?string $name = null): FileSystem
     {
         $name = $name ?: ($this->config['default'] ?? 'local');
 
@@ -33,7 +33,7 @@ class FileSystemManager
     /**
      * @throws MachinjiriException
      */
-    protected function resolve(string $name): Filesystem
+    protected function resolve(string $name): FileSystem
     {
         $diskConfig = $this->getDiskConfig($name);
         $driver = $diskConfig['driver'] ?? null;
@@ -48,7 +48,7 @@ class FileSystemManager
             default => throw new MachinjiriException("Unsupported driver: {$driver}", 500),
         };
 
-        return new Filesystem($adapter);
+        return new FileSystem($adapter);
     }
 
     /**

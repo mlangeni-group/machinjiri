@@ -16,7 +16,7 @@ namespace Mlangeni\Machinjiri\Core\Providers\CoreProviders;
 use Mlangeni\Machinjiri\Core\Providers\ServiceProvider;
 use Mlangeni\Machinjiri\Core\Http\{HttpRequest, HttpResponse, HttpClient};
 use Mlangeni\Machinjiri\Core\Authentication\{Session, Cookie, AuthManager};
-use Mlangeni\Machinjiri\Core\Artisans\Logging\{Logger, LoggerFactory};
+use Mlangeni\Machinjiri\Core\Artisans\Logging\Logger;
 use Mlangeni\Machinjiri\Core\Artisans\Events\{EventListener, Event};
 use Mlangeni\Machinjiri\Core\Debug\Debugger;
 use Mlangeni\Machinjiri\Core\FileSystem\FileSystemManager;
@@ -32,17 +32,8 @@ use Mlangeni\Machinjiri\Core\Authentication\ThirdParty\ThirdPartyAuth;
 use Mlangeni\Machinjiri\Core\Exceptions\MachinjiriException;
 use Mlangeni\Machinjiri\Core\Components\Network\Tools\{Manager, Scanner, Monitor, NetworkConfig};
 use Mlangeni\Machinjiri\Core\Components\Webhooks\{WebhookSubscriptionManager, WebhookManager};
-use Mlangeni\Machinjiri\Core\Components\LDAP\{
-    Manager as LDAPManager,
-    Connection as LDAPConnection,
-    EntryManager
-};
-use Mlangeni\Machinjiri\Core\Performance\{
-    Insight\Insight,
-    Insight\Reporters\ArrayReporter,
-    Insight\Reporters\JsonReporter
-};
-
+use Mlangeni\Machinjiri\Core\Components\LDAP\{Manager as LDAPManager, Connection as LDAPConnection, EntryManager};
+use Mlangeni\Machinjiri\Core\Performance\Insight\Insight;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -58,239 +49,50 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        // -------------------- HTTP Request/Response --------------------
-        // Register the HTTP request as a singleton, created from global PHP superglobals.
-        $this->singleton(HttpRequest::class, function($app) {
-            return HttpRequest::createFromGlobals();
-        });
+        // Register the HTTP request/response handling services.
+        $this->registerHttpServices();
 
-        // Register the HTTP response as a singleton for output manipulation.
-        $this->singleton(HttpResponse::class, function($app) {
-            return new HttpResponse();
-        });
+        // Register authentication and session-related services.
+        $this->registerAuthenticationServices();
 
-        // Register the HTTP client for making external requests.
-        $this->singleton(HttpClient::class, function($app) {
-            return new HttpClient();
-        });
+        // Register development and debugging helpers.
+        $this->registerDebuggingServices();
 
-        // -------------------- Authentication Services --------------------
-        // Session and Cookie handlers are singletons for state management.
-        $this->singleton(Session::class, function ($app) {
-            return new Session($app);
-        });
-        
-        $this->singleton(Cookie::class, function ($app) {
-            return new Cookie($app);
-        });
+        // Register filesystem and storage abstractions.
+        $this->registerFileSystemServices();
 
-        // AuthManager handles authentication logic; requires configuration.
-        $this->singleton(AuthManager::class, function ($app) {
-            $config = $app->configurations['auth'] ?? false;
-            // Ensure authentication configuration exists; otherwise throw an exception.
-            if (!$config) throw new MachinjiriException("App Service Error: auth config not found");
-            return new AuthManager($app, $config);
-        });
+        // Register queue workers and job processing services.
+        $this->registerQueueServices();
 
-        // -------------------- Debugging --------------------
-        // Debugger is registered as a singleton for centralized debugging.
-        $this->app->singleton(Debugger::class, function ($app) {
-            return new Debugger($app);
-        });
+        // Register logging and monitoring services.
+        $this->registerLoggerServices();
 
-        // -------------------- Filesystem Adapters --------------------
-        // LocalAdapter uses the root path from the filesystem configuration.
-        $this->app->singleton(LocalAdapter::class, function ($app) {
-            return new LocalAdapter($app->configurations['filesystem']['disks']['local']['root']);
-        });
+        // Register in-memory and persistent caching services.
+        $this->registerCachingServices();
 
-        // FtpAdapter uses the FTP configuration from the filesystem settings.
-        $this->app->singleton(FtpAdapter::class, function ($app) {
-            return new FtpAdapter($app->configurations['filesystem']['disks']['ftp']);
-        });
+        // Register mail and transport services for outgoing messages.
+        $this->registerTransportServices();
 
-        // FileSystemManager manages multiple disks; passed the full filesystem config.
-        $this->app->singleton(FileSystemManager::class, function ($app) {
-            return new FileSystemManager($app->configurations['filesystem']);
-        });
+        // Register security primitives such as hashing, encryption, and tokens.
+        $this->registerSecurityServices();
 
-        // -------------------- Caching --------------------
-        // CacheManager handles caching strategies using the cache configuration.
-        $this->app->singleton(CacheManager::class, function ($app) {
-            return new CacheManager($app->configurations['cache']);
-        });
+        // Register third-party authentication providers and integrations.
+        $this->registerThirdPartyAuthServices();
 
-        // -------------------- Mail Transport --------------------
-        // MailManager is responsible for sending emails; it creates its own logger
-        // and event listener internally, and uses a queue dispatcher if available.
-        $this->app->singleton(MailManager::class, function ($app) {
-            $log = "mailer-transport";
-            return new MailManager(
-                $app,
-                null,
-                new Logger('mailer-transport', Logger::DEBUG, false, '', 'system'),
-                new EventListener(
-                    new Logger('mailer-transport', Logger::DEBUG, true, '', 'system')
-                ),
-                null,
-                $app->resolve('queue.dispatcher')
-            );
-        });
+        // Register LDAP directory connection and entry management services.
+        $this->registerLDAPServices();
 
-        // -------------------- SMS Transport --------------------
-        $this->app->singleton(SMSManager::class, function ($app) {
-            return SMSManager::fromConfig($app->configurations['sms'] ?? [], $app);
-        });
+        // Register networking tools and infrastructure services.
+        $this->registerNetworkServices();
 
-        // -------------------- Event System --------------------
-        // EventListener is bound as a regular binding (not singleton) to allow
-        // fresh instances with a dedicated logger.
-        $this->bind(EventListener::class, function($app) {
-            return new EventListener($app->resolve('app.main.logger'));
-        });
+        // Register webhook subscription and delivery managers.
+        $this->registerWebhookServices();
 
-        $this->singleton('app.main.logger', function ($app) {
-            return new Logger(env('APP_NAME') ?? 'machinjiri', Logger::DEBUG, true, '', 'app');
-        });
+        // Register performance-insight and telemetry services.
+        $this->registerPerformanceServices();
 
-        // -------------------- Logging --------------------
-        // Logger binding uses the application name from environment, with DEBUG level.
-        $this->bind(Logger::class, function($app) {
-            return new Logger(env('APP_NAME') ?? 'machinjiri', Logger::DEBUG, false, '', 'app');
-        });
-
-        // -------------------- CSRF Protection --------------------
-        // CSRFToken singleton requires Session, Cookie, and a token name from env.
-        $this->app->singleton(CSRFToken::class, function ($app) {
-            return new CSRFToken(
-                $app->resolve(Session::class),
-                $app->resolve(Cookie::class),
-                env("CSRF_TOKEN_NAME", "csrf_token"),
-                env("CSRF_COOKIE_NAME", "csrf_token"),
-                env("CSRF_TTL", 3600),
-                new CookieOptions(),
-                env("CSRF_MAX_FAILURES", 5)
-            );
-        });
-
-        // -------------------- Routing Configuration --------------------
-        // RoutingConfig loads the routing.php configuration file if it exists.
-        $this->singleton(RoutingConfig::class, function ($app) {
-            $config = $this->app->coreConfig . 'routing.php';
-            return is_file($config) ? require $config : null;
-        });
-
-        // -------------------- Security Services --------------------
-        // Hasher provides hashing utilities (bcrypt, etc.) as a singleton.
-        $this->singleton(Hasher::class, function ($app) {
-            return new Hasher($app, $app->resolve(Logger::class));
-        });
-
-        // Bangwe is the encryption service, requiring the application instance.
-        $this->singleton(Bangwe::class, function ($app) {
-            return new Bangwe($app);
-        });
-
-        // -------------------- Third-Party Authentication --------------------
-        // ThirdPartyAuth uses the OAuth configuration from the application config.
-        $this->singleton(ThirdPartyAuth::class, function ($app) {
-            return new ThirdPartyAuth($app->configurations['oauth']);
-        });
-
-        // -------------------- LDAP Manager --------------------
-        // Custom LDAP manager registered with a string alias, using LDAP config.
-        $this->singleton(LDAPManager::class, function ($app) {
-            return new LDAPManager($app->configurations['ldap']);
-        });
-
-        $this->singleton(LDAPConnection::class, function ($app) {
-            return $app->resolve(LDAPManager::class)->connection();
-        });
-
-        $this->singleton(EntryManager::class, function ($app) {
-            return new EntryManager($app->resolve(LDAPConnection::class));
-        });
-
-        // -------------------- Network Components --------------------
-        // Network Manager, Scanner, and Monitor are registered as singletons.
-        $this->singleton("network.manager", function ($app) {
-            return new Manager(
-                $app->resolve("network.scanner"),
-                $app->resolve("network.monitor"),
-                $app->resolve("cache.manager"),
-                $app->resolve("network.config"),
-                $app->resolve('queue.dispatcher'),
-                $app->resolve(EventListener::class)
-            );
-        });
-
-        $this->singleton("network.scanner", function ($app) {
-            return new Scanner(
-                $app->resolve("cache.manager"),
-                $app->resolve("network.config"),
-                $app->resolve(HttpClient::class)
-            );
-        });
-
-        $this->singleton("network.monitor", function ($app) {
-            return new Monitor(
-                $app->resolve("network.scanner"),
-                $app->resolve("cache.manager"),
-                $app->resolve("network.config")
-            );
-        });
-        
-        $this->singleton("network.config", function ($app) {
-            $config = $this->app->coreConfig . 'network.php';
-            return is_file($config) ? require $config : new NetworkConfig();
-        });
-
-        // -------------------- Webhook Components --------------------
-        // WebhookSubscriptionManager, and WebhookManager are registered as singletons.
-        $this->singleton(WebhookSubscriptionManager::class, function ($app) {
-            return new WebhookSubscriptionManager($app->configurations['webhooks'] ?? []);
-        });
-
-        $this->singleton(WebhookManager::class, function ($app) {
-            return new WebhookManager($app, $app->resolve(WebhookSubscriptionManager::class), $app->resolve(CacheManager::class));
-        });
-
-
-        // -------------------- Performance Components --------------------
-        // Insight and Mornitor are registered as singletons.
-        $this->singleton(Insight::class, function ($app) {
-            return new Insight();
-        });
-
-
-        // -------------------- Aliases for Convenience --------------------
-        // Provide shorter names for common services to simplify dependency resolution.
-        $this->aliasMany([
-            'request'                       => HttpRequest::class,
-            'response'                      => HttpResponse::class,
-            'auth.session'                  => Session::class,
-            'auth.cookie'                   => Cookie::class,
-            'auth.thirdparty'               => ThirdPartyAuth::class,
-            'auth.manager'                  => AuthManager::class,
-            'debugger'                      => Debugger::class,
-            'events'                        => EventListener::class,
-            'fs.adapter.local'              => LocalAdapter::class,
-            'fs.adapter.ftp'                => FtpAdapter::class,
-            'fs.manager'                    => FileSystemManager::class,
-            'cache.manager'                 => CacheManager::class,
-            'mail.manager'                  => MailManager::class,
-            'sms.manager'                   => SMSManager::class,
-            'logger'                        => Logger::class,
-            'routing.config'                => RoutingConfig::class,
-            'auth.manager'                  => AuthManager::class,
-            'security.hasher'               => Hasher::class,
-            'security.bangwe'               => Bangwe::class,
-            'webhook.manager'               => WebhookManager::class,
-            'webhook.subscription.manager'  => WebhookSubscriptionManager::class,
-            'ldap.manager'                  => LDAPManager::class,
-            'ldap.connection'               => LDAPConnection::class,
-            'perf.insight.class'            => Insight::class,
-        ]);
+        // Register aliases for easier access to services.
+        $this->registerAliases();
     }
 
     /**
@@ -355,4 +157,269 @@ class AppServiceProvider extends ServiceProvider
             array_keys($this->aliases)
         );
     }
+
+    private function registerFileSystemServices()
+    {
+        // LocalAdapter uses the root path from the filesystem configuration.
+        $this->app->singleton(LocalAdapter::class, function ($app) {
+            return new LocalAdapter($app->configurations['filesystem']['disks']['local']['root']);
+        });
+
+        // FtpAdapter uses the FTP configuration from the filesystem settings.
+        $this->app->singleton(FtpAdapter::class, function ($app) {
+            return new FtpAdapter($app->configurations['filesystem']['disks']['ftp']);
+        });
+
+        // FileSystemManager manages multiple disks; passed the full filesystem config.
+        $this->app->singleton(FileSystemManager::class, function ($app) {
+            return new FileSystemManager($app->configurations['filesystem']);
+        });
+    }
+
+    private function registerQueueServices()
+    {
+        // QueueManager is responsible for managing job queues; uses the queue config.
+        $this->app->singleton('queue.manager', function ($app) {
+            return new \Mlangeni\Machinjiri\Core\Artisans\Queue\QueueManager($app->configurations['queue']);
+        });
+
+        // QueueDispatcher handles dispatching jobs to the appropriate queue.
+        $this->app->singleton('queue.dispatcher', function ($app) {
+            return new \Mlangeni\Machinjiri\Core\Artisans\Queue\QueueDispatcher($app->resolve('queue.manager'));
+        });
+    }
+
+    private function registerLoggerServices()
+    {
+        // Logger is registered as a singleton with the application name and debug level.
+        $this->app->singleton(Logger::class, function ($app) {
+            return new Logger(env('APP_NAME') ?? 'machinjiri', Logger::DEBUG, false, '', 'app');
+        });
+
+        $this->singleton('app.main.logger', function ($app) {
+            return new Logger(env('APP_NAME') ?? 'machinjiri', Logger::DEBUG, true, '', 'app');
+        });
+
+        // EventListener is registered to listen for events and log them.
+        $this->app->singleton(EventListener::class, function ($app) {
+            return new EventListener($app->resolve('app.main.logger'));
+        });
+    }
+
+    private function registerSecurityServices()
+    {
+        // Hasher provides hashing utilities (bcrypt, etc.) as a singleton.
+        $this->singleton(Hasher::class, function ($app) {
+            return new Hasher($app, $app->resolve(Logger::class));
+        });
+
+        // Bangwe is the encryption service, requiring the application instance.
+        $this->singleton(Bangwe::class, function ($app) {
+            return new Bangwe($app);
+        });
+
+        // -------------------- CSRF Protection --------------------
+        // CSRFToken singleton requires Session, Cookie, and a token name from env.
+        $this->app->singleton(CSRFToken::class, function ($app) {
+            return new CSRFToken(
+                $app->resolve(Session::class),
+                $app->resolve(Cookie::class),
+                env("CSRF_TOKEN_NAME", "csrf_token"),
+                env("CSRF_COOKIE_NAME", "csrf_token"),
+                env("CSRF_TTL", 3600),
+                new CookieOptions(),
+                env("CSRF_MAX_FAILURES", 5)
+            );
+        });
+    }
+
+    private function registerThirdPartyAuthServices()
+    {
+        // ThirdPartyAuth uses the OAuth configuration from the application config.
+        $this->singleton(ThirdPartyAuth::class, function ($app) {
+            return new ThirdPartyAuth($app->configurations['oauth']);
+        });
+    }
+
+    private function registerLDAPServices()
+    {
+        // Custom LDAP manager registered with a string alias, using LDAP config.
+        $this->singleton(LDAPManager::class, function ($app) {
+            return new LDAPManager($app->configurations['ldap']);
+        });
+
+        $this->singleton(LDAPConnection::class, function ($app) {
+            return $app->resolve(LDAPManager::class)->connection();
+        });
+
+        $this->singleton(EntryManager::class, function ($app) {
+            return new EntryManager($app->resolve(LDAPConnection::class));
+        });
+    }
+
+    private function registerNetworkServices()
+    {
+        // Network Manager, Scanner, and Monitor are registered as singletons.
+        $this->singleton("network.manager", function ($app) {
+            return new Manager(
+                $app->resolve("network.scanner"),
+                $app->resolve("network.monitor"),
+                $app->resolve("cache.manager"),
+                $app->resolve("network.config"),
+                $app->resolve('queue.dispatcher'),
+                $app->resolve(EventListener::class)
+            );
+        });
+
+        $this->singleton("network.scanner", function ($app) {
+            return new Scanner(
+                $app->resolve("cache.manager"),
+                $app->resolve("network.config"),
+                $app->resolve(HttpClient::class)
+            );
+        });
+
+        $this->singleton("network.monitor", function ($app) {
+            return new Monitor(
+                $app->resolve("network.scanner"),
+                $app->resolve("cache.manager"),
+                $app->resolve("network.config")
+            );
+        });
+        
+        $this->singleton("network.config", function ($app) {
+            $config = $this->app->coreConfig . 'network.php';
+            return is_file($config) ? require $config : new NetworkConfig();
+        });
+    }
+
+    private function registerWebhookServices()
+    {
+        // WebhookSubscriptionManager, and WebhookManager are registered as singletons.
+        $this->singleton(WebhookSubscriptionManager::class, function ($app) {
+            return new WebhookSubscriptionManager($app->configurations['webhooks'] ?? []);
+        });
+
+        $this->singleton(WebhookManager::class, function ($app) {
+            return new WebhookManager($app, $app->resolve(WebhookSubscriptionManager::class), $app->resolve(CacheManager::class));
+        });
+    }
+
+    private function registerPerformanceServices()
+    {
+        // Insight and Monitor are registered as singletons.
+        $this->singleton(Insight::class, function ($app) {
+            return new Insight();
+        });
+    }
+
+    private function registerAliases()
+    {
+        // Provide shorter names for common services to simplify dependency resolution.
+        $this->aliasMany([
+            'request'                       => HttpRequest::class,
+            'response'                      => HttpResponse::class,
+            'auth.session'                  => Session::class,
+            'auth.cookie'                   => Cookie::class,
+            'auth.thirdparty'               => ThirdPartyAuth::class,
+            'auth.manager'                  => AuthManager::class,
+            'debugger'                      => Debugger::class,
+            'events'                        => EventListener::class,
+            'fs.adapter.local'              => LocalAdapter::class,
+            'fs.adapter.ftp'                => FtpAdapter::class,
+            'fs.manager'                    => FileSystemManager::class,
+            'cache.manager'                 => CacheManager::class,
+            'mail.manager'                  => MailManager::class,
+            'sms.manager'                   => SMSManager::class,
+            'logger'                        => Logger::class,
+            'routing.config'                => RoutingConfig::class,
+            'auth.manager'                  => AuthManager::class,
+            'security.hasher'               => Hasher::class,
+            'security.bangwe'               => Bangwe::class,
+            'webhook.manager'               => WebhookManager::class,
+            'webhook.subscription.manager'  => WebhookSubscriptionManager::class,
+            'ldap.manager'                  => LDAPManager::class,
+            'ldap.connection'               => LDAPConnection::class,
+            'perf.insight.class'            => Insight::class,
+        ]);
+    }
+
+    private function registerTransportServices()
+    {
+        // MailManager is responsible for sending emails; it creates its own logger
+        // and event listener internally, and uses a queue dispatcher if available.
+        $this->singleton(MailManager::class, function ($app) {
+            $log = "mailer-transport";
+            return new MailManager(
+                $app,
+                null,
+                new Logger('mailer-transport', Logger::DEBUG, false, '', 'system'),
+                new EventListener(
+                    new Logger('mailer-transport', Logger::DEBUG, true, '', 'system')
+                ),
+                null,
+                $app->resolve('queue.dispatcher')
+            );
+        });
+
+        // SMSManager is responsible for sending SMS messages; it uses the SMS config.
+        $this->singleton(SMSManager::class, function ($app) {
+            return SMSManager::fromConfig($app->configurations['sms'] ?? [], $app);
+        });
+    }
+
+    private function registerAuthenticationServices()
+    {
+        // Session and Cookie handlers are singletons for state management.
+        $this->singleton(Session::class, function ($app) {
+            return new Session($app);
+        });
+        
+        $this->singleton(Cookie::class, function ($app) {
+            return new Cookie($app);
+        });
+
+        // AuthManager handles authentication logic; requires configuration.
+        $this->singleton(AuthManager::class, function ($app) {
+            $config = $app->configurations['auth'] ?? false;
+            // Ensure authentication configuration exists; otherwise throw an exception.
+            if (!$config) throw new MachinjiriException("App Service Error: auth config not found");
+            return new AuthManager($app, $config);
+        });
+    }
+
+    private function registerDebuggingServices()
+    {
+        // Debugger is registered as a singleton for centralized debugging.
+        $this->app->singleton(Debugger::class, function ($app) {
+            return new Debugger($app);
+        });
+    }
+
+    private function registerCachingServices()
+    {
+        // CacheManager handles caching strategies using the cache configuration.
+        $this->app->singleton(CacheManager::class, function ($app) {
+            return new CacheManager($app->configurations['cache']);
+        });
+    }
+
+    private function registerHttpServices()
+    {
+        // Register the HTTP request as a singleton, created from global PHP superglobals.
+        $this->singleton(HttpRequest::class, function($app) {
+            return HttpRequest::createFromGlobals();
+        });
+
+        // Register the HTTP response as a singleton for output manipulation.
+        $this->singleton(HttpResponse::class, function($app) {
+            return new HttpResponse();
+        });
+
+        // Register the HTTP client for making external requests.
+        $this->singleton(HttpClient::class, function($app) {
+            return new HttpClient();
+        });
+    }
+
 }

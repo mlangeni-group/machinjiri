@@ -61,7 +61,7 @@ class HelperLoader
     {
         return [
             'app.php', 'events.php', 'dateTime.php', 'dump.php', 'viewEngine.php',
-            'routing.php', 'http.php', 'database.php', 'caching.php',
+            'routing.php', 'http.php', 'database.php', 'caching.php', 'security.php',
         ];
     }
     

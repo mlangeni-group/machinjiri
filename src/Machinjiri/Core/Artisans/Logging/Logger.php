@@ -181,12 +181,14 @@ class Logger
         if (is_scalar($value) || $value === null) {
             return (string)$value;
         }
+
         if (is_object($value)) {
             if (method_exists($value, '__toString')) {
-                return (string)$value;
+                return (string) $value;
             }
             return '[object ' . get_class($value) . ']';
         }
+
         return json_encode($value, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?: 'JSON encoding error';
     }
 
