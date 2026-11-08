@@ -2,6 +2,9 @@
 
 Machinjiri is a modular, production-ready PHP framework for building maintainable web applications, APIs, and internal tools with speed and clarity. It combines a resilient service container, expressive routing, database tooling, security helpers, queue processing, task scheduling, and modern developer tooling in a single cohesive platform.
 
+https://img.shields.io/badge/machinjiri-framework-purple
+https://img.shields.io/badge/version-2.3.0-blue
+
 Current stable version: `2.3.0`
 
 Machinjiri requires **PHP 8.3 or higher**. See the examples below for the current security, queue, and testing APIs.
