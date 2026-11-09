@@ -9,7 +9,7 @@ class FormValidatorExtended extends FormValidator
     // File validation rules
     protected function validateFile($value): bool
     {
-        return $value instanceof \UploadedFile && $value->getError() === UPLOAD_ERR_OK;
+        return $value instanceof UploadedFile && $value->getError() === UPLOAD_ERR_OK;
     }
 
     protected function validateImage($value): bool

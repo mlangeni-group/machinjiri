@@ -1,6 +1,7 @@
 <?php
 namespace Mlangeni\Machinjiri\Core\Forms;
 
+use Mlangeni\Machinjiri\Core\Container;
 use Mlangeni\Machinjiri\Core\Http\HttpRequest;
 use Mlangeni\Machinjiri\Core\Http\HttpResponse;
 use Mlangeni\Machinjiri\Core\Authentication\Session;
@@ -19,6 +20,7 @@ abstract class FormRequest
     protected FormErrorBag $errorBag;
     protected array $oldInput = [];
     protected array $uploadedFiles = [];
+    protected array $validatedData = [];
     protected bool $validated = false;
 
     // If true, uses double-submit cookie + session token
@@ -26,20 +28,20 @@ abstract class FormRequest
     protected string $csrfTokenName = '_token';
 
     public function __construct(
-        HttpRequest $httpRequest,
-        HttpResponse $httpResponse,
-        Session $session,
-        CSRFToken $csrfToken,
-        FileSystemManager $fileSystem
+        ?HttpRequest $httpRequest = null,
+        ?HttpResponse $httpResponse = null,
+        ?Session $session = null,
+        ?CSRFToken $csrfToken = null,
+        ?FileSystemManager $fileSystem = null
     ) {
-        $this->httpRequest = $httpRequest;
-        $this->httpResponse = $httpResponse;
-        $this->session = $session;
-        $this->csrfToken = $csrfToken;
-        $this->fileSystem = $fileSystem;
+        $app = Container::getInstance();
+        $this->httpRequest = $httpRequest ?? $app->resolve(HttpRequest::class);
+        $this->httpResponse = $httpResponse ?? $app->resolve(HttpResponse::class);
+        $this->session = $session ?? $app->resolve(Session::class);
+        $this->csrfToken = $csrfToken ?? $app->resolve(CSRFToken::class);
+        $this->fileSystem = $fileSystem ?? $app->resolve(FileSystemManager::class);
         $this->errorBag = new FormErrorBag();
         $this->validator = new FormValidatorExtended();
-        $this->loadOldInput();
     }
 
     /**
@@ -98,9 +100,16 @@ abstract class FormRequest
         $baseDir = rtrim($this->uploadDirectory(), '/') . '/';
 
         foreach ($this->rules() as $field => $ruleString) {
-            if (str_contains($ruleString, 'file') && isset($validatedData[$field])) {
+            $ruleNames = array_map(
+                static fn(string $rule) => explode(':', $rule, 2)[0],
+                explode('|', $ruleString)
+            );
+
+            $fileRules = ['file', 'image', 'mimes', 'maxSize', 'minSize', 'dimensions'];
+
+            if (array_intersect($ruleNames, $fileRules) && isset($validatedData[$field])) {
                 $file = $validatedData[$field];
-                if ($file instanceof \UploadedFile && $file->getError() === UPLOAD_ERR_OK) {
+                if ($file instanceof UploadedFile && $file->getError() === UPLOAD_ERR_OK) {
                     $clientName = $file->getClientOriginalName();
                     $safeName = preg_replace('/[^a-zA-Z0-9_.-]/', '_', $clientName);
                     $path = $baseDir . $safeName;
@@ -137,6 +146,8 @@ abstract class FormRequest
      */
     public function validate(): bool
     {
+        $this->validatedData = [];
+
         if (!$this->authorize()) {
             $this->errorBag->add('_form', 'Unauthorized action.');
             return false;
@@ -176,9 +187,7 @@ abstract class FormRequest
                     $rule = $ruleName;
                 }
                 if (in_array($rule, ['file', 'image', 'mimes', 'maxSize', 'minSize', 'dimensions'])) {
-                    $fileValue = $this->httpRequest->getUploadedFile($field);
                     $this->validator->addRule($field, $rule, ...$params);
-                    $this->validator->setData(array_merge($this->validator->getData(), [$field => $fileValue]));
                 } else {
                     $this->validator->addRule($field, $rule, ...$params);
                 }
@@ -194,7 +203,7 @@ abstract class FormRequest
             $this->saveOldInputToSession();
         } else {
             $validatedData = $this->validator->getValidatedData();
-            $validatedData = $this->handleUploads($validatedData);
+            $this->validatedData = $this->handleUploads($validatedData);
             $this->session->set('form_old_input', []);
             $this->session->set('form_errors', []);
         }
@@ -210,7 +219,7 @@ abstract class FormRequest
         if (!$this->validated) {
             throw new MachinjiriException("Cannot get validated data before validation.");
         }
-        return $this->validator->getValidatedData();
+        return $this->validatedData;
     }
 
     /**
@@ -259,7 +268,7 @@ abstract class FormRequest
         }
 
         // Merge with file inputs
-        foreach ($_FILES as $key => $fileArray) {
+        foreach ($this->httpRequest->getFiles() as $key => $fileArray) {
             $data[$key] = $this->normalizeFileInput($fileArray);
         }
 
@@ -287,7 +296,7 @@ abstract class FormRequest
             $files = [];
             foreach ($fileArray['tmp_name'] as $index => $tmpName) {
                 if ($fileArray['error'][$index] === UPLOAD_ERR_OK) {
-                    $files[] = new \UploadedFile(
+                    $files[] = new UploadedFile(
                         $tmpName,
                         $fileArray['name'][$index],
                         $fileArray['type'][$index],
@@ -299,7 +308,7 @@ abstract class FormRequest
             return $files;
         }
         if ($fileArray['error'] === UPLOAD_ERR_OK) {
-            return new \UploadedFile(
+            return new UploadedFile(
                 $fileArray['tmp_name'],
                 $fileArray['name'],
                 $fileArray['type'],
@@ -319,10 +328,11 @@ abstract class FormRequest
         return $this->csrfToken->validateToken($token);
     }
 
-    private function loadOldInput(): void
+    public function loadOldInput(): self
     {
         $old = $this->session->get('form_old_input', []);
         $this->oldInput = is_array($old) ? $old : [];
+        return $this;
     }
 
     private function saveOldInputToSession(): void
@@ -345,5 +355,15 @@ abstract class FormRequest
         return $doubleSubmit
             ? $csrfToken->generateTokenWithCookie()
             : $csrfToken->generateToken();
+    }
+
+    public function getErrorBag(): FormErrorBag
+    {
+        return $this->errorBag;
+    }
+
+    public function getErrors(): array
+    {
+        return $this->errorBag->all();
     }
 }

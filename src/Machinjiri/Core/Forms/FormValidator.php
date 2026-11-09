@@ -1,5 +1,7 @@
 <?php
+
 namespace Mlangeni\Machinjiri\Core\Forms;
+
 use Mlangeni\Machinjiri\Core\Forms\RuleBuilder;
 
 class FormValidator
@@ -53,35 +55,36 @@ class FormValidator
     $this->validatedData = [];
 
     foreach ($this->rules as $field => $rules) {
-      $value = $this->getValue($field);
+        $value = $this->getValue($field);
 
-      foreach ($rules as $ruleDef) {
-        $rule = $ruleDef['rule'];
-        $params = $ruleDef['params'];
+        foreach ($rules as $ruleDef) {
+            $rule = $ruleDef['rule'];
+            $params = $ruleDef['params'];
 
-        // Handle callable rules
-        if (is_callable($rule)) {
-          $result = $rule($value, ...$params);
-          if ($result !== true) {
-            $this->addError($field, 'custom', $result);
-          }
-          continue;
+            // Handle callable rules
+            if (is_callable($rule)) {
+              $result = $rule($value, ...$params);
+              if ($result !== true) {
+                $this->addError($field, 'custom', $result);
+              }
+              continue;
+            }
+
+            // Handle built-in rules
+            $method = "validate" . ucfirst($rule);
+            if (method_exists($this, $method)) {
+              if (!$this->$method($value, ...$params)) {
+                $this->addError($field, $rule, ...$params);
+              }
+            }
         }
-
-        // Handle built-in rules
-        $method = "validate" . ucfirst($rule);
-        if (method_exists($this, $method)) {
-          if (!$this->$method($value, ...$params)) {
-            $this->addError($field, $rule, ...$params);
-          }
-        }
-      }
 
         // If valid and not empty, add to validated data
         if (!isset($this->errors[$field])) {
           $this->validatedData[$field] = $value;
         }
-      }
+        
+    }
 
       return empty($this->errors);
     }

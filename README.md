@@ -1,1411 +1,231 @@
 # Machinjiri PHP Framework
 
-Machinjiri is a modular, production-ready PHP framework for building maintainable web applications, APIs, and internal tools with speed and clarity. It combines a resilient service container, expressive routing, database tooling, security helpers, queue processing, task scheduling, and modern developer tooling in a single cohesive platform.
+Machinjiri is a PHP framework for building web applications, APIs, and internal tools. This guide is written as a first project tutorial: install Machinjiri, run an app, add a route, and render a page.
 
-Current stable version: `2.3.0`
+![Machinjiri PHP Framework](https://img.shields.io/badge/Machinjiri-PHP_Framework-6C2EB9?logo=php&logoColor=white)
+![Version 2.3.0](https://img.shields.io/badge/Version-2.3.0-2563EB)
+![PHP ^8.4](https://img.shields.io/badge/PHP-%5E8.4-777BB4?logo=php&logoColor=white)
+![Composer 2.0+](https://img.shields.io/badge/Composer-2.0%2B-885630?logo=composer&logoColor=white)
+![Proprietary license](https://img.shields.io/badge/License-Proprietary-lightgrey)
 
-Machinjiri requires **PHP 8.3 or higher**. See the examples below for the current security, queue, and testing APIs.
+## What you'll build
 
-## Installation
+By the end of this tutorial, your app will respond to `/` with a page that is rendered from a view template. You will learn how routes, controllers, and views work together.
 
-### Install using Installer
-Download and install the Installer globally using composer in terminal
+## Before you begin
+
+You will need:
+
+- PHP 8.4 or newer
+- Composer 2.0 or newer
+- A terminal and a code editor
+
+Machinjiri also uses PHP extensions including PDO, cURL, JSON, and OpenSSL. Some features need additional extensions, such as LDAP or FTP.
+
+## 1. Create a new application
+
+Install the Machinjiri installer globally with Composer:
 
 ```bash
 composer global require machinjiri/installer
 ```
-Once the Installer is installed. Scaffold your project by running the create command:
+
+Create a project. You can replace `hello-machinjiri` with your preferred project name:
 
 ```bash
-machinjiri create my-app
+machinjiri create hello-machinjiri
 ```
-Follow the prompts to create your application
 
-### Install with Composer
-
-Install Machinjiri as a dependency in your project:
+Follow the installer's prompts, then change into the new project directory:
 
 ```bash
-composer require machinjiri/framework
+cd hello-machinjiri
 ```
 
-### Local development
+If your terminal cannot find the `machinjiri` command, make sure Composer's global vendor `bin` directory is on your `PATH`.
 
-To run the framework repository locally:
+## 2. Start the development server
 
-```bash
-git clone https://github.com/mlangeni-group/machinjiri.git
-cd machinjiri
-composer install
-```
-
-### Recommended setup
-
-- Copy `.env.example` to `.env`
-- Set `APP_KEY`, database, and mail credentials
-- Run `composer test` to verify the installation
-
-## Quick Start
-
-### 1. Create Your First Route
-
-```php
-// routes/web.php
-use Mlangeni\Machinjiri\Core\Routing\Router;
-
-Router::get('/', function() {
-    return 'Welcome to Machinjiri!';
-});
-
-Router::get('/hello/{name}', function($name) {
-    return "Hello, {$name}!";
-}, 'greeting');
-```
-
-### 2. Create a Controller
-
-```php
-// app/Controllers/HomeController.php
-namespace App\Controllers;
-
-class HomeController
-{
-    public function index()
-    {
-        return view('home', ['title' => 'Home Page']);
-    }
-}
-```
-
-### 3. Create a View
-
-```html
-<!-- resources/views/home.view.php -->
-<% extend('layouts.app') %>
-
-<% section('content') %>
-    <div class="container">
-        <h1><%= $title %></h1>
-        <p>Welcome to your Machinjiri application!</p>
-    </div>
-<% endsection %>
-```
-
-### 4. Connect Route to Controller
-
-```php
-// routes/web.php
-Router::get('/', 'HomeController@index', 'home');
-```
-
-### 5. Start Development Server
+Run the app's local development server:
 
 ```bash
 php artisan run:dev
 ```
 
-Visit `http://localhost:3000` in your browser.
+Open [http://localhost:3000](http://localhost:3000) in your browser. Keep the terminal open while you work; it displays server output. Press `Ctrl+C` to stop it.
 
-## Project Structure
+## 3. Add your first route
 
-```
-your-project/
-├── app/
-│   ├── Controllers/          # Application controllers
-│   ├── Jobs/                 # Application Jobs
-│   ├── Middleware/           # Custom middleware classes
-│   ├── Queue/                # Queue Drivers
-│   │     └── Drivers/        # Driver Files (Custom Queue Drivers)
-│   ├── Models/               # Data models
-│   ├── Tasks/                # Scheduled Tasks
-│   ├── Webhooks/             # Webhooks
-│   ├── Providers/            # Service providers
-│   └── Exceptions/           # Custom exceptions
-├── bootstrap/
-│   └── app.php               # App Bootstrap
-├── config/
-│   ├── core/                 # Application configuration
-│   │   ├── app.php        
-│   │   ├── cache.php 
-│   │   └── auth.php
-│   └── services
-│       └── providers.php     # Service providers list
-├── database/
-│   ├── migrations/           # Database migration files
-│   ├── seeders/              # Database seeder classes
-│   ├── factories/            # Database factory classes
-│   └── cache-prefetch-db.php # Prefetch Database Cache file 
-├── resources/
-│   └── views/                # View templates
-│       ├── layouts/          # Layout templates
-│       ├── partials/         # Reusable view fragments
-│       └── pages/            # Page-specific views
-├── routes/
-│   └── web.php               # Web application routes
-├── storage/
-│   ├── cache/                # Cached data files
-│   ├── cookies/              # Cookie storage
-│   ├── logs/                 # Application logs
-│   └── sessions/             # Session files
-├── public/
-│   ├── src/
-│   │   ├── css/              # Stylesheets
-│   │   ├── js/               # JavaScript files
-│   │   └── images/           # Image assets
-│   ├── .htaccess             # .htaccess config file
-│   └── index.php             # Application entry point
-├── vendor/                   # Composer dependencies
-├── .env                      # Environment configuration
-├── artisan                   # Console application
-├── composer.json             # Project dependencies
-└── phpunit.xml               # PHPUnit configuration
-```
-
-## Table of Contents
-
-- [Introduction](#introduction)
-- [Features](#features)
-- [System Requirements](#system-requirements)
-- [Core Components](#core-components)
-  - [Routing](#routing-system)
-  - [Views & Templates](#view-engine)
-  - [Database](#database--orm)
-  - [Authentication & Security](#authentication--security)
-    - [LDAP](#ldap)
-  - [Forms & Validation](#forms--validation)
-  - [Service Providers](#service-providers)
-  - [Mail System](#mail-system)
-  - [Queues & Jobs](#queues--jobs)
-    - [Task Scheduler](#task-scheduler)
-    - [Webhooks](#webhooks)
-    - [SMS](#sms)
-- [Usage Examples](#usage-examples)
-- [Configuration](#-configuration)
-- [API Reference](#-api-reference)
-- [Error Handling](#-error-handling)
-- [Testing](#testing)
-- [Console Commands (Artisan)](#console-commands)
-- [Contributing](#contributing)
-- [License](#license)
-- [Support](#support)
-
-## Introduction
-
-Machinjiri is designed to accelerate web development with:
-- **Modular architecture** with service providers and dependency injection
-- **Elegant routing** with middleware, groups, and named routes
-- **Powerful view templating** with inheritance and asset management
-- **Multi-database support** with migrations and query builders
-- **Built-in authentication** with OAuth, sessions, and cookies
-- **Advanced security** with encryption, hashing, CSRF tokens, and SQL injection prevention
-- **Job queues** for background processing
-- **Task scheduling** with cron expressions and persistent execution history
-- **Webhook handling** with signature verification and synchronous or queued dispatch
-- **SMS transport** with configurable providers and asynchronous delivery
-- **Comprehensive logging** and error handling
-
-## Features
-
-### Core Architecture
-
-- **Singleton Application Container**: Centralized management of application resources and configuration
-- **Service Container**: Powerful dependency injection with service binding and resolution
-- **Provider System**: Modular service providers with lazy loading and bootstrapping
-- **Configuration Management**: Environment-aware config loading with `.env` support
-- **Service Facades**: Quick access to complex services with simple syntax
-- **FTP Filesystem Adapter**: Remote storage operations with FTP disk support
-- **Redis Integration**: Distributed cache and queue support for scalable workflows
-- **Webhook Processing**: Signature verification, idempotency, and async dispatch for webhook handling
-- **ULID & OTP Utilities**: ULID generation/validation and OTP/TOTP support for secure workflows
-
-### Routing System
-
-- **Flexible HTTP Routing**: RESTful routes with GET, POST, PUT, DELETE, PATCH methods
-- **Route Groups**: Apply middleware, prefixes, and CORS to multiple routes
-- **Route Parameters**: Capture and validate route parameters
-- **AJAX Handling**: Built-in AJAX-only and traditional route segregation
-- **Named Routes**: Generate URLs using route names and parameters
-- **CORS Support**: Automatic CORS header handling and preflight requests
-- **Rate Limiting**: Configurable request rate limiting per route
-- **Route Caching**: Performance optimization through route caching
-
-### View Engine
-
-- **Template Inheritance**: Blade-like template inheritance with layouts and sections
-- **Custom Template Tags**: `<% %>` syntax with PHP logic support
-- **Partial Includes**: Component-based development with fragment includes
-- **Asset Management**: Automatic CSS/JS resource loading
-- **Data Sharing**: Share data across multiple views globally
-- **Loop Directives**: Enhanced foreach loops with context variables
-
-### Database & ORM
-
-- **Multi-Driver Support**: MySQL, PostgreSQL, SQLite database drivers
-- **Query Builder**: Expressive, fluent query construction
-- **Migrations**: Built-in migration system for database schema management
-- **Schema Builder**: Create, modify, and drop tables programmatically
-- **Seeders & Factories**: Database seeding and model factories for testing
-- **Connection Pool**: Manage multiple database connections
-- **Transaction Support**: ACID compliance with transaction handling
-
-### Authentication & Security
-
-- **Session Management**: Secure session handling with configurable drivers
-- **OAuth Integration**: Third-party authentication (Google, GitHub, etc.)
-- **Cookie Management**: Secure cookie handling with encryption options
-- **Password Hashing**: Configurable bcrypt/Argon2 hashing, password policies, and verify-and-rehash support
-- **CSRF Token Protection**: Expiring tokens, validation, and configurable cookie options
-- **SQL Injection Prevention**: Parameterized queries via query builder
-- **Encryption**: Configurable AES encryption, including authenticated AES-GCM
-- **JWT Tokens**: JSON Web Token support for API authentication
-
-### Forms & Validation
-
-- **Form Validation**: Comprehensive validation rules engine
-- **Rule Builder**: Fluent interface for building complex validation rules
-- **Password Rules**: Special validation rules for password strength
-- **Error Messages**: Custom error messages and localization support
-- **CSRF Helpers**: Token field generation and request validation
-
-### Queues & Jobs
-
-- **Background Job Processing**: Defer heavy operations to background queues
-- **Database Queue Driver**: Persist jobs in database for reliability
-- **Redis Queue Driver**: High-performance Redis-backed job queue with delayed dispatch, reservation, and retry handling
-- **Job Dispatcher**: Flexible job scheduling and dispatching
-- **Workers**: Process jobs with configurable retry logic
-- **Event System**: Event listeners and viewers for queue events
-- **Artisan Commands**: Generate jobs and manage queue processing
-
-### Task Scheduler
-
-- **Persistent schedules**: Store scheduled tasks and execution history through the database repository
-- **Cron expressions**: Define when tasks run using standard cron syntax
-- **Queued execution**: Dispatch due tasks to the scheduler queue
-- **Overlap protection**: Lock tasks to prevent concurrent execution
-- **Task management**: Register, sync, enable, disable, run, and delete tasks
-- **Operational controls**: Group and prioritize tasks, configure retries, cache schedule data, and inspect scheduler health
-
-### Webhooks
-
-- **Provider subscriptions**: Register event handlers and provider-specific behavior
-- **Signature verification**: Support HMAC, timestamped HMAC, and custom verification callbacks
-- **Synchronous or asynchronous processing**: Route providers to immediate handling or the `webhooks` queue
-- **Idempotency support**: Track processed webhook keys through the cache-backed idempotency store
-- **Response handling**: Return accepted, unauthorized, not-found, and other HTTP responses based on processing results
-
-### SMS
-
-- **Transport registry**: Configure and select SMS transports through the SMS manager
-- **Synchronous delivery**: Send messages immediately through the default transport
-- **Asynchronous delivery**: Queue SMS sends on the `sms` queue when enabled
-- **Extensible providers**: Add custom transports and receive structured delivery responses
-
-### Components
-
-The former bundled Bootstrap UI component package has been removed. Build UI with your application templates or a frontend library of your choice.
-
-### HTTP Layer
-
-- **Request/Response Objects**: Object-oriented HTTP request and response handling
-- **Request Utilities**: Easy access to GET/POST/FILE data, headers, and server info
-- **Response Types**: JSON, redirects, downloads, streaming responses
-- **Middleware Support**: Stack-based middleware pipeline with arguments
-- **Header Management**: Easy header manipulation and CORS configuration
-- **Status Codes**: Comprehensive HTTP status code support
-
-### Logging & Monitoring
-
-- **Multi-Channel Logging**: Database, file, and event-based logging
-- **Structured Logging**: Log levels (DEBUG, INFO, WARNING, ERROR, CRITICAL)
-- **Event System**: Event listeners for application events
-- **Error Logging**: Automatic logging of exceptions and errors
-- **Environment-Aware**: Different logging behavior for dev/production
-
-### Date & Time Handling
-
-- **DateTime Handler**: Unified date/time manipulation
-- **Timezone Support**: Configurable timezone handling
-- **Format Support**: Multiple date format support
-- **Utility Methods**: Common date operations built-in
-
-### Network Utilities
-
-- **HTTP Client**: cURL-based HTTP client for API calls
-- **Server Management**: PHP built-in server management for development
-- **Connection Handling**: Request/response HTTP utilities
-
-## System Requirements
-
-- **PHP**: 8.3 or higher (compatible with PHP 8.4)
-- **Extensions**:
-  - PDO (for database support)
-  - cURL (for HTTP client)
-  - JSON (for API support)
-  - OpenSSL (for encryption)
-  - ftp (optional, for FTP filesystem support)
-  - ldap (optional, for LDAP authentication and directory integration)
-- **Composer**: 2.0 or higher
-- **Database**: MySQL 5.7+, PostgreSQL 10+, or SQLite 3+
-
-## Core Components
-
-### Routing System
-
-The router handles all HTTP requests and directs them to appropriate controllers or callbacks.
-
-**Basic Routing:**
-
-```php
-use Mlangeni\Machinjiri\Core\Routing\Router;
-
-// Simple routes
-Router::get('/users', 'UserController@list');
-Router::post('/users', 'UserController@store');
-Router::put('/users/{id}', 'UserController@update');
-Router::delete('/users/{id}', 'UserController@destroy');
-Router::patch('/users/{id}', 'UserController@patch');
-Router::any('/path', 'Controller@method');
-
-// Named routes
-Router::get('/profile/{id}', 'UserController@show', 'user.profile');
-
-// Route groups
-Router::group(['prefix' => '/api', 'middleware' => 'api'], function() {
-    Router::get('/users', 'ApiUserController@list');
-    Router::post('/users', 'ApiUserController@store');
-});
-
-// AJAX routes
-Router::ajax('/api/data', 'ApiController@getData');
-
-// Traditional routes
-Router::traditional('/contact', 'ContactController@show');
-
-// Generate URLs
-$url = Router::route('user.profile', ['id' => 5]);
-$absoluteUrl = Router::absoluteRoute('user.profile', ['id' => 5]);
-```
-
-**Middleware:**
-
-```php
-// Apply middleware to routes
-Router::group(['middleware' => 'auth'], function() {
-    Router::get('/dashboard', 'DashboardController@index');
-});
-
-// Multiple middleware
-Router::group(['middleware' => ['auth', 'admin']], function() {
-    Router::get('/admin', 'AdminController@dashboard');
-});
-
-// Middleware with parameters
-Router::group(['middleware' => 'role:admin'], function() {
-    Router::delete('/users/{id}', 'UserController@destroy');
-});
-```
-
-**CORS Configuration:**
-
-```php
-Router::cors([
-    'allowed_origins' => ['https://example.com'],
-    'allowed_methods' => ['GET', 'POST', 'OPTIONS'],
-    'allowed_headers' => ['Content-Type', 'Authorization'],
-], function() {
-    Router::get('/api/public', 'ApiController@public');
-});
-```
-
-### View Engine
-
-Machinjiri provides a powerful templating engine with a clean, readable syntax.
-
-**Template Syntax:**
-
-```php
-<% if $user->isAdmin() %>
-    <a href="/admin">Admin Panel</a>
-<% else %>
-    <a href="/profile">My Profile</a>
-<% endif %>
-
-<% foreach $products as $product %>
-    <div>{{ $product->name }} - {{ $product->price }}</div>
-<% endforeach %>
-```
-
-**Layout Example:**
-
-```html
-<!-- resources/views/layouts/app.view.php -->
-<!DOCTYPE html>
-<html>
-<head>
-    <title><%= $title ?? 'My App' %></title>
-    <% include 'partials.stylesheets' %>
-</head>
-<body>
-    <header>
-        <% include 'partials.navbar' %>
-    </header>
-    
-    <main>
-        <% yield('content') %>
-    </main>
-    
-    <footer>
-        <% include 'partials.footer' %>
-    </footer>
-    
-    <% include 'partials.scripts' %>
-</body>
-</html>
-```
-
-**Usage in Controller:**
-
-```php
-use Mlangeni\Machinjiri\Core\Views\View;
-
-public function index($req, $res)
-{
-    return View::make('home', [
-        'title' => 'Home Page',
-        'featured' => $featured,
-    ])->render();
-    
-    // Or display directly
-    View::make('home', ['title' => 'Home'])->display();
-    
-    // Share data globally
-    View::share('user', auth()->user());
-}
-```
-
-### Database & ORM
-
-Machinjiri provides a powerful query builder and migration system for database operations.
-
-**Database Configuration:**
-
-```php
-// config/database.php
-return [
-    'driver' => env('DB_CONNECTION', 'mysql'),
-    'host' => env('DB_HOST', 'localhost'),
-    'username' => env('DB_USERNAME', 'root'),
-    'password' => env('DB_PASSWORD', ''),
-    'database' => env('DB_DATABASE', 'machinjiri'),
-    'port' => env('DB_PORT', 3306),
-];
-```
-
-**Query Builder:**
-
-```php
-use Mlangeni\Machinjiri\Core\Database\Builders\QueryBuilder;
-
-// Simple queries
-$users = (new QueryBuilder('users'))->select()->get();
-$user = (new QueryBuilder('users'))
-    ->select()
-    ->where('id', '=', 5)
-    ->first();
-
-// Complex queries
-$result = (new QueryBuilder('users'))
-    ->select(['id', 'name', 'email'])
-    ->where('active', '=', true)
-    ->where('role', '=', 'admin')
-    ->orderBy('name', 'asc')
-    ->limit(10)
-    ->get();
-
-// Insert
-(new QueryBuilder('users'))->insert([
-    'name' => 'John',
-    'email' => 'john@example.com',
-]);
-
-// Update
-(new QueryBuilder('users'))
-    ->where('id', '=', 5)
-    ->update(['name' => 'Jane']);
-
-// Delete
-(new QueryBuilder('users'))->where('id', '=', 5)->delete();
-
-// Aggregate functions
-$count = (new QueryBuilder('users'))->select()->count();
-$max = (new QueryBuilder('posts'))->max('views');
-```
-
-**Migrations:**
-
-```bash
-# Create migration
-php artisan make:migration create_users_table
-
-# Run migrations
-php artisan migrate
-
-# Rollback
-php artisan migrate:rollback
-```
-
-```php
-// database/migrations/2024_01_01_000000_create_users_table.php
-class CreateUsersTable
-{
-    public function up()
-    {
-        Schema::create('users', function($table) {
-            $table->increments('id');
-            $table->string('name');
-            $table->string('email')->unique();
-            $table->string('password');
-            $table->timestamps();
-        });
-    }
-    
-    public function down()
-    {
-        Schema::dropIfExists('users');
-    }
-}
-```
-
-**Seeders:**
-
-```bash
-php artisan make:seeder UserSeeder
-php artisan db:seed
-```
-
-### Authentication & Security
-
-Machinjiri provides comprehensive authentication and security features.
-
-**Session-Based Authentication:**
-
-```php
-// config/auth.php
-return [
-    'guard' => 'web',
-    'providers' => [
-        'users' => [
-            'driver' => 'database',
-            'table' => 'users',
-        ],
-    ],
-];
-```
-
-**Login/Logout:**
-
-```php
-// In your controller
-public function login($req, $res)
-{
-    $credentials = $req->only(['email', 'password']);
-    
-    if (auth()->attempt($credentials)) {
-        return $res->redirect('/dashboard');
-    }
-    
-    return view('auth.login', ['error' => 'Invalid credentials']);
-}
-
-public function logout($req, $res)
-{
-    auth()->logout();
-    return $res->redirect('/');
-}
-```
-
-**OAuth Integration:**
-
-```php
-use Mlangeni\Machinjiri\Core\Authentication\OAuth;
-
-$oauth = new OAuth($config);
-$token = $oauth->getAccessToken($code);
-$user = $oauth->getUserInfo($token);
-```
-
-**Password Security:**
-
-```php
-use Mlangeni\Machinjiri\Core\Security\Hashing\Hasher;
-use Mlangeni\Machinjiri\Core\Security\Password\Password;
-use Mlangeni\Machinjiri\Core\Security\Password\PasswordPolicy;
-
-$policy = new PasswordPolicy(
-    minLength: 12,
-    requireSpecial: false,
-);
-
-$password = new Password($plainText, $policy);
-if (!$password->validate()) {
-    $errors = $password->errors();
-    // Return validation errors to the user.
-}
-
-$hash = $password->hash();
-
-// Verify at login and persist a replacement hash when the configured
-// hashing algorithm or cost has changed.
-$hasher = new Hasher();
-$hasher->verifyAndRehash($candidate, $storedHash, function (string $newHash) use ($user): void {
-    $user->update(['password' => $newHash]);
-});
-```
-
-**CSRF Protection:**
-
-The controller base class provides `csrfField()` and `verifyCsrf()` helpers. The token service also supports expiring tokens and the double-submit cookie pattern:
-
-```php
-use Mlangeni\Machinjiri\Core\Security\Tokens\CSRFToken;
-
-// Resolve the configured singleton from the application container.
-$csrf = $app->resolve(CSRFToken::class);
-$field = $csrf->csrfField(); // Escaped hidden input, ready for a form.
-
-$token = $csrf->getToken();
-if ($csrf->validateToken($submittedToken)) {
-    // Continue processing the request.
-}
-
-// For clients using a double-submit cookie, issue and validate both values.
-$cookieToken = $csrf->generateTokenWithCookie();
-$validCookieToken = $csrf->validateTokenWithCookie($submittedCookieToken);
-```
-
-**Encryption:**
-
-```php
-use Mlangeni\Machinjiri\Core\Security\Encryption\Cipher;
-
-// Configure the cipher under the "encryption" key loaded by the application.
-// AES-GCM authenticates ciphertext as well as encrypting it.
-$cipher = new Cipher();
-$encrypted = $cipher->encrypt($plainText);
-$decrypted = $cipher->decrypt($encrypted);
-```
-
-Set the default cipher and secret in the application configuration; do not hard-code secrets in source:
-
-```php
-// config/core/encryption.php
-return [
-    'default' => 'aes-256-gcm',
-    'ciphers' => [
-        'aes-256-gcm' => [
-            'cipher' => 'aes-256-gcm',
-            'secret' => env('APP_KEY'),
-            'iv_size' => 12,
-            'tag_size' => 16,
-            'aead' => true,
-        ],
-    ],
-];
-```
-
-### LDAP
-
-The LDAP component provides configured connections, escaped query filters, and LDAP entry objects. The PHP LDAP extension must be enabled before using it.
-
-**Register an LDAP manager:**
-
-```php
-// app/Providers/LdapServiceProvider.php
-namespace App\Providers;
-
-use Mlangeni\Machinjiri\Core\Components\LDAP\Manager as LdapManager;
-use Mlangeni\Machinjiri\Core\Container;
-use Mlangeni\Machinjiri\Core\Providers\ServiceProvider;
-
-class LdapServiceProvider extends ServiceProvider
-{
-    public function register(): void
-    {
-        $this->app->singleton('ldap.manager', function (Container $app) {
-            return new LdapManager([
-                'default' => 'directory',
-                'connections' => [
-                    'directory' => [
-                        'hosts' => [env('LDAP_HOST', 'ldap.example.com')],
-                        'port' => (int) env('LDAP_PORT', 389),
-                        'base_dn' => env('LDAP_BASE_DN', 'dc=example,dc=com'),
-                        'username' => env('LDAP_BIND_DN'),
-                        'password' => env('LDAP_BIND_PASSWORD'),
-                        'use_tls' => (bool) env('LDAP_USE_TLS', true),
-                    ],
-                ],
-            ]);
-        });
-    }
-}
-```
-
-Add the provider to `config/providers.php`, then query the directory from a controller or service:
-
-```php
-use Mlangeni\Machinjiri\Core\Components\LDAP\Manager as LdapManager;
-
-public function directoryUsers(LdapManager $ldap): array
-{
-    return $ldap->connection()->query()
-        ->where('objectClass', '=', 'inetOrgPerson')
-        ->where('mail', 'contains', '@example.com')
-        ->select(['uid', 'cn', 'mail'])
-        ->sizeLimit(100)
-        ->get();
-}
-
-foreach (directoryUsers(resolve('ldap.manager')) as $entry) {
-    echo $entry->getAttribute('cn');
-    echo $entry->getAttribute('mail');
-    echo $entry->getDn();
-}
-```
-
-For LDAP-backed authentication, configure the guard with the `ldap` provider driver. The provider searches by `uid` and `mail`, synchronizes selected attributes to the local user model, and validates passwords by binding with the user DN:
-
-```php
-// config/auth.php
-return [
-    'default' => 'web',
-    'guards' => [
-        'web' => [
-            'driver' => 'session',
-            'provider' => [
-                'driver' => 'ldap',
-                'model' => App\Models\User::class,
-                'username_attribute' => 'uid',
-                'search_fields' => ['uid', 'mail'],
-                'sync_attributes' => [
-                    'name' => 'cn',
-                    'email' => 'mail',
-                ],
-            ],
-        ],
-    ],
-];
-```
-
-### Forms & Validation
-
-Create and validate forms with ease.
-
-**Form Validation:**
-
-```php
-use Mlangeni\Machinjiri\Core\Forms\FormValidator;
-
-public function store($req, $res)
-{
-    $validator = new FormValidator($req->all());
-    
-    $validator->validate([
-        'name' => 'required|string|max:255',
-        'email' => 'required|email|unique:users',
-        'password' => 'required|min:8|confirmed',
-    ]);
-    
-    if ($validator->fails()) {
-        return view('register', ['errors' => $validator->errors()]);
-    }
-    
-    // Create user
-    User::create($validator->validated());
-}
-```
-
-**Custom Rules:**
-
-```php
-$validator = new FormValidator($data);
-
-$validator->validate([
-    'age' => [
-        'required',
-        'integer',
-        function($attribute, $value, $fail) {
-            if ($value < 18) {
-                $fail('Must be 18 or older');
-            }
-        },
-    ],
-]);
-```
-
-### Queues & Jobs
-
-Process background jobs asynchronously.
-
-**Create a Job:**
-
-```bash
-php artisan make:job SendWelcomeEmail
-```
-
-```php
-// app/Jobs/SendWelcomeEmail.php
-namespace App\Jobs;
-
-use Mlangeni\Machinjiri\Core\Artisans\Contracts\BaseJob;
-use Mlangeni\Machinjiri\Core\Container;
-use Mlangeni\Machinjiri\Core\Exceptions\ContractsException\JobException;
-
-class SendWelcomeEmail extends BaseJob
-{
-    public function __construct(Container $app, int $userId)
-    {
-        parent::__construct($app, ['user_id' => $userId], [
-            'queue' => 'default',
-            'maxAttempts' => 3,
-            'timeout' => 60,
-        ]);
-    }
-
-    public function handle(): void
-    {
-        $userId = $this->getPayload()['user_id'];
-        // Resolve services and perform the work using the application container.
-    }
-
-    public function failed(JobException $exception): void
-    {
-        parent::failed($exception);
-        // Add application-specific failure handling if needed.
-    }
-}
-```
-
-**Dispatch Job:**
-
-```php
-use Mlangeni\Machinjiri\Core\Artisans\Contracts\BaseJobDispatcher;
-
-// Inject or resolve the configured dispatcher and application container.
-$dispatcher = $app->resolve(BaseJobDispatcher::class);
-$jobId = $dispatcher->dispatch(new SendWelcomeEmail($app, $userId));
-
-// Explicit queue or delayed dispatch:
-$jobId = $dispatcher->dispatchToQueue(
-    new SendWelcomeEmail($app, $userId),
-    'emails',
-);
-$delayedJobId = $dispatcher->dispatchWithDelay(
-    new SendWelcomeEmail($app, $userId),
-    300,
-);
-```
-
-**Process Jobs:**
-
-```bash
-php artisan queue:work --queue=default --sleep=3 --memory=128 --timeout=60
-# Limit the number of jobs or stop when the queue is empty:
-php artisan queue:work --max-jobs=100
-php artisan queue:work --stop-on-empty
-```
-
-### Task Scheduler
-
-Scheduled tasks extend `ScheduledTask`, define a cron expression, and implement `handle()`. Register task classes with the task manager or use the generator to create and register one:
-
-```bash
-php artisan scheduler:create-task SendDailyReport --cron="0 9 * * *" --register
-php artisan scheduler:list
-php artisan scheduler:run
-```
-
-The scheduler persists task definitions and execution history, dispatches work to the `scheduler` queue, prevents overlapping runs by default, and supports task groups, priorities, retries, maintenance-mode behavior, and cached status data. Use `scheduler:status`, `scheduler:stats`, `scheduler:enable`, and `scheduler:disable` to operate it.
-
-### Webhooks
-
-Configure provider subscriptions with their signing secret, verification method, event handlers, and whether processing should be synchronous or queued. Incoming requests are processed through `WebhookManager`:
-
-```php
-$response = $webhookManager->process($payload);
-```
-
-Queued providers are dispatched to the `webhooks` queue and return an accepted response. Synchronous providers invoke all matching handlers and return the first failed response, or the final successful response. HMAC, timestamped HMAC, and custom signature callbacks are supported.
-
-### SMS
-
-Configure one or more SMS transports and send through the manager. Delivery can be immediate or queued on the `sms` queue:
-
-```php
-$response = $smsManager->send($message);
-$queuedResponse = $smsManager->send($message, true);
-```
-
-The manager returns a structured response, logs delivery failures, and supports custom transports through the transport registry.
-
-## ⚙️ Configuration
-
-### Environment Configuration
-
-Configuration is managed through `.env` files and config classes:
-
-```env
-# .env
-APP_NAME=Machinjiri
-APP_ENV=local
-APP_DEBUG=true
-APP_KEY=your-app-key-here
-
-DB_CONNECTION=mysql
-DB_HOST=localhost
-DB_PORT=3306
-DB_DATABASE=machinjiri
-DB_USERNAME=root
-DB_PASSWORD=
-
-MAIL_DRIVER=smtp
-MAIL_HOST=smtp.mailtrap.io
-MAIL_PORT=465
-MAIL_USERNAME=your-username
-MAIL_PASSWORD=your-password
-MAIL_FROM_ADDRESS=noreply@machinjiri.com
-```
-
-### Application Configuration
-
-```php
-// config/app.php
-return [
-    'name' => env('APP_NAME', 'Machinjiri'),
-    'env' => env('APP_ENV', 'production'),
-    'debug' => env('APP_DEBUG', false),
-    'key' => env('APP_KEY'),
-    
-    'timezone' => 'UTC',
-    'locale' => 'en',
-    
-    'url' => env('APP_URL', 'http://localhost'),
-];
-```
-
-### Service Provider Configuration
-
-```php
-// config/providers.php
-return [
-    'providers' => [
-        App\Providers\AppServiceProvider::class,
-        App\Providers\AuthServiceProvider::class,
-        App\Providers\RouteServiceProvider::class,
-    ],
-    
-    'aliases' => [
-        'Router' => Mlangeni\Machinjiri\Core\Routing\Router::class,
-        'View' => Mlangeni\Machinjiri\Core\Views\View::class,
-    ],
-];
-```
-
-### Mail Configuration
-
-```php
-// config/mail.php
-return [
-  'default' => env('MAIL_DRIVER', 'phpmailer'),
-  'transports' => [
-    'phpmailer' => [
-      'transport' => 'phpmailer',
-      'host' => env('MAIL_HOST', 'smtp.mailtrap.io'),
-      'port' => env('MAIL_PORT', 2525),
-      'encryption' => env('MAIL_ENCRYPTION', 'tls'),
-      'username' => env('MAIL_USERNAME'),
-      'password' => env('MAIL_PASSWORD'),
-      'timeout' => null,
-      'auth_mode' => null,
-      'debug' => false, //debug mode for smtp
-      'from_address' => env('MAIL_FROM_ADDRESS', 'hello@example.com'),
-    ],
-      // Add other transports as needed
-  ]
-];
-```
-
-## API Reference
-
-### Application Container
-
-```php
-use Mlangeni\Machinjiri\Core\Machinjiri;
-
-// Get application instance
-$app = Machinjiri::getInstance();
-
-// Bind service
-$app->bind('key', function($app) {
-    return new Service();
-});
-
-// Resolve service
-$service = $app->resolve('key');
-
-// Check environment
-$isProduction = Machinjiri::getEnvironment() === 'production';
-$isDevelopment = Machinjiri::getEnvironment() === 'development';
-
-// Get configuration
-$config = $app->config('app.timezone');
-```
-
-### Router API
-
-```php
-use Mlangeni\Machinjiri\Core\Routing\Router;
-
-// HTTP Methods
-Router::get($pattern, $handler, $name = null, $options = []);
-Router::post($pattern, $handler, $name = null, $options = []);
-Router::put($pattern, $handler, $name = null, $options = []);
-Router::delete($pattern, $handler, $name = null, $options = []);
-Router::patch($pattern, $handler, $name = null, $options = []);
-Router::any($pattern, $handler, $name = null, $options = []);
-Router::match($methods, $pattern, $handler, $name = null, $options = []);
-
-// Special Routes
-Router::ajax($pattern, $handler, $name = null, $options = []);
-Router::traditional($pattern, $handler, $name = null, $options = []);
-
-// Route Groups
-Router::group($attributes, $callback);
-
-// Middleware
-Router::middleware($middleware, $callback);
-
-// CORS
-Router::cors($config, $callback);
-
-// URL Generation
-Router::route($name, $parameters = []);
-Router::absoluteRoute($name, $parameters = []);
-
-// Dispatching
-Router::dispatch();
-```
-
-### View API
-
-```php
-use Mlangeni\Machinjiri\Core\Views\View;
-
-// Create and render
-View::make($view, $data = []);
-View::make($view, $data)->render();
-View::make($view, $data)->display();
-
-// Share data globally
-View::share($key, $value);
-
-// Template functions (in view files)
-<%= $variable %>              // Output variable
-<% section('name') %>...<%endsection %>   // Define section
-<% yield('name') %>           // Output section
-<% extend('layout') %>        // Extend layout
-<% include 'partial' %>       // Include partial
-<% if($cond): %> ... <% endif; %>   // Conditionals
-<% foreach($items as $item): %> ... <% endforeach; %>
-```
-
-### Request API
-
-```php
-// In route handler or controller
-public function handle($request, $response)
-{
-    // Get data
-    $all = $request->all();
-    $input = $request->input('name');
-    $only = $request->only(['email', 'password']);
-    $except = $request->except(['password']);
-    
-    // Check methods
-    $isPost = $request->isPost();
-    $isJson = $request->isJson();
-    $isAjax = $request->isAjax();
-    
-    // Get headers
-    $auth = $request->header('Authorization');
-    $headers = $request->headers();
-    
-    // Files
-    $file = $request->file('avatar');
-    $files = $request->files();
-    
-    // Server info
-    $method = $request->method();
-    $uri = $request->uri();
-    $path = $request->path();
-}
-```
-
-### Response API
-
-```php
-// In route handler or controller
-public function handle($request, $response)
-{
-    // Simple responses
-    return "String response";
-    
-    // JSON response
-    return $response->json(['data' => $data]);
-    
-    // Redirect
-    return $response->redirect('/home');
-    return $response->redirectBack();
-    
-    // View response
-    return view('page', ['data' => $data]);
-    
-    // File download
-    return $response->download('/path/to/file');
-    
-    // Set headers
-    $response->header('X-Custom', 'value');
-    
-    // Set status
-    $response->status(201);
-    
-    // Cookies
-    $response->cookie('name', 'value', 3600);
-}
-```
-
-### Database API
-
-```php
-use Mlangeni\Machinjiri\Core\Database\Builders\QueryBuilder;
-
-// Query builder
-$result = (new QueryBuilder('users'))
-    ->select(['id', 'name', 'email'])
-    ->where('active', true)
-    ->whereIn('role', ['admin', 'moderator'])
-    ->orderBy('name', 'asc')
-    ->limit(10)
-    ->get();
-
-// Retrieve single
-$user = (new QueryBuilder('users'))->select()->where('id', 5)->first();
-
-// Insert
-(new QueryBuilder('users'))->insert([
-    'name' => 'John',
-    'email' => 'john@example.com',
-]);
-
-// Update
-(new QueryBuilder('users'))
-    ->where('id', 5)
-    ->update(['name' => 'Jane']);
-
-// Delete
-(new QueryBuilder('users'))->where('id', 5)->delete();
-
-// Aggregate
-$count = (new QueryBuilder('users'))->count();
-$max = (new QueryBuilder('posts'))->max('views');
-$avg = (new QueryBuilder('orders'))->select()->avg('amount');
-
-// Exists
-$exists = (new QueryBuilder('users'))->where('email', $email)->exists();
-```
-
-## Error Handling
-
-Machinjiri provides comprehensive error handling with environment-aware output:
-
-```php
-use Mlangeni\Machinjiri\Core\Exceptions\MachinjiriException;
-
-try {
-    // Your code
-    if (!$user) {
-        throw new MachinjiriException('User not found', 404);
-    }
-} catch (MachinjiriException $e) {
-    // Access error details
-    $message = $e->getMessage();
-    $code = $e->getCode();
-    
-    // Display error (different in dev/prod)
-    $e->show();
-    
-    // Or handle manually
-    return view('error', ['error' => $e->getMessage()]);
-}
-```
-
-**Error Handler Features:**
-
-- Environment-specific error pages (development vs production)
-- Automatic logging of uncaught exceptions
-- User-friendly error messages in production
-- Detailed stack traces in development
-- HTTP status code mapping
-- Custom error handlers per exception type
-- Request and application context attached to error reports
-- Configurable error reporting by email through the mail manager
-- Error throttling to prevent repeated failures from overwhelming logs or notifications
-- Error, exception, and shutdown handlers for runtime and fatal errors
-- Custom exception renderers through `ErrorHandler::setExceptionRenderer()`
-
-## Console Commands (Artisan)
-
-Machinjiri includes an Artisan console for many development workflows. Common commands include:
-
-```bash
-# Server management
-php artisan run:dev              # Start development server
-php artisan stop:dev               # Stop development server
-
-# Database and migrations
-php artisan db:migration:create      # Create a new migration file
-php artisan db:migration:list        # List available migrations
-php artisan db:migration:migrate     # Run migrations
-php artisan db:migration:rollback    # Roll back the last batch of migrations
-php artisan db:seeder:create         # Create a new seeder
-php artisan db:seeder:run            # Run a seeder
-php artisan db:seeder:run-all        # Run all seeders
-php artisan db:seeder:refresh        # Refresh seeders
-php artisan db:factory:create        # Create a new factory
-
-# Code generation
-php artisan make:controller Name     # Create controller
-php artisan make:middleware Name     # Create middleware
-php artisan make:job Name            # Create job
-php artisan make:webhook Name        # Create webhook scaffolding
-php artisan view:make Name           # Create a view template
-php artisan provider:make Name       # Create a service provider
-
-# Queue and worker management
-php artisan queue:init               # Initialize queue resources
-php artisan queue:work               # Process jobs
-php artisan queue:failed             # List failed jobs
-php artisan queue:retry              # Retry a failed job
-php artisan queue:clear              # Clear queued jobs
-php artisan queue:status             # Show queue status
-php artisan queue:health             # Report queue health
-
-# Scheduled task management
-php artisan scheduler:create-task Name --register
-php artisan scheduler:list
-php artisan scheduler:run
-php artisan scheduler:status
-php artisan scheduler:enable ID
-php artisan scheduler:disable ID
-php artisan scheduler:stats [ID]
-php artisan scheduler:clean --days=30
-php artisan scheduler:cache-preload
-php artisan scheduler:cache-clear
-
-# Utilities
-php artisan test                     # Run test suite
-php artisan get:env                  # Display environment variables
-php artisan config:cache             # Cache configuration
-php artisan route:cache              # Cache routes
-php artisan view:cache               # Cache views
-```
-
-## Testing
-
-Machinjiri uses PHPUnit for its test suite. The framework-specific `Mlangeni\Machinjiri\Testing` base case, traits, fakes, and assertions are no longer included; extend PHPUnit's test case and use PHPUnit or Mockery directly.
+A route connects a URL to the code that handles a request. Open `routes/web.php` and add a route for the home page:
 
 ```php
 <?php
 
-namespace Tests\Unit;
+use Mlangeni\Machinjiri\Core\Routing\Router;
 
-use PHPUnit\Framework\TestCase;
-use Mlangeni\Machinjiri\Core\Security\Password\PasswordPolicy;
+Router::get('/', function () {
+    return '<h1>Hello from Machinjiri!</h1>';
+}, 'home');
 
-class ExampleTest extends TestCase
+Router::dispatch();
+```
+
+Refresh `http://localhost:3000`. The route matches `GET /`, runs the function, and sends the returned HTML to the browser. The optional name, `home`, lets you refer to this route elsewhere in your app.
+
+> If your generated `routes/web.php` already dispatches routes, keep that existing `Router::dispatch()` call and add only the `Router::get(...)` definition.
+
+## 4. Move the page into a controller
+
+As an app grows, it is useful to move request handling out of the route file. Create `app/Controllers/HomeController.php`:
+
+```php
+<?php
+
+namespace App\Controllers;
+
+use Mlangeni\Machinjiri\Core\Artisans\Base\AbstractController;
+use Mlangeni\Machinjiri\Core\Http\HttpRequest;
+use Mlangeni\Machinjiri\Core\Http\HttpResponse;
+
+class HomeController extends AbstractController
 {
-    public function testPasswordPolicyDefaults(): void
+    public function index(HttpRequest $request, HttpResponse $response): string
     {
-        $policy = new PasswordPolicy();
-
-        self::assertSame(8, $policy->minLength);
-        self::assertTrue($policy->requireSpecial);
+        return $this->view('home', [
+            'title' => 'My first Machinjiri page',
+            'message' => 'You have connected a route, controller, and view.',
+        ]);
     }
 }
 ```
 
-### Running the suite
+Update the route in `routes/web.php` to point to this controller:
 
-```bash
-# Run all tests
-composer test
+```php
+<?php
 
-# Run a single test file
-vendor/bin/phpunit tests/Unit/ExampleTest.php
+use App\Controllers\HomeController;
+use Mlangeni\Machinjiri\Core\Routing\Router;
 
-# Run with coverage
-vendor/bin/phpunit --coverage-html coverage
+Router::get('/', [HomeController::class, 'index'], 'home');
+
+Router::dispatch();
 ```
 
-Use PHPUnit's standard setup and assertions for application tests. Configure any database, mail, or queue test doubles in your project rather than relying on framework-provided testing fakes.
+The router creates the controller and passes it the current request and response. `AbstractController` provides the `view()` helper, which renders a template and returns its HTML.
 
-## Contributing
+## 5. Create a view
 
-We welcome contributions! Here's how to get started:
+Create `resources/views/home.view.php`:
 
-1. **Fork the Repository**
-   ```bash
-   git clone https://github.com/yourusername/machinjiri.git
-   cd machinjiri
-   ```
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ $title }}</title>
+</head>
+<body>
+    <main>
+        <h1>{{ $title }}</h1>
+        <p>{{ $message }}</p>
+    </main>
+</body>
+</html>
+```
 
-2. **Create a Feature Branch**
-   ```bash
-   git checkout -b feature/amazing-feature
-   ```
+The `{{ ... }}` syntax prints and HTML-escapes a value, which is the safe default for text. The controller passes `$title` and `$message` to the view as an array. Save the files and refresh the browser to see the finished page.
 
-3. **Make Your Changes**
-   - Follow PSR-12 coding standards
-   - Add tests for new features
-   - Update documentation
+Your app's request flow is now:
 
-4. **Commit and Push**
-   ```bash
-   git add .
-   git commit -m 'Add amazing feature'
-   git push origin feature/amazing-feature
-   ```
+1. The browser requests `/`.
+2. The router matches the request to `HomeController::index`.
+3. The controller passes data to the `home` view.
+4. The view renders HTML for the browser.
 
-5. **Open a Pull Request**
-   - Describe your changes clearly
-   - Reference any related issues
-   - Ensure tests pass
+## 6. Add another page
 
-### Development Setup
+You can add a second route that accepts a URL parameter. Add this method to `HomeController`:
+
+```php
+public function greeting(HttpRequest $request, HttpResponse $response, string $name): string
+{
+    return $this->view('greeting', ['name' => $name]);
+}
+```
+
+Register the route in `routes/web.php`:
+
+```php
+Router::get('/hello/{name}', [HomeController::class, 'greeting'], 'greeting');
+```
+
+Create `resources/views/greeting.view.php`:
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Hello</title>
+</head>
+<body>
+    <h1>Hello, {{ $name }}!</h1>
+    <p><a href="/">Back to the home page</a></p>
+</body>
+</html>
+```
+
+Visit `http://localhost:3000/hello/Ada` to try it. The `{name}` part of the route is passed to the controller method, and the view escapes it when displaying it.
+
+## Everyday development
+
+From your application directory:
 
 ```bash
-# Install dependencies
-composer install
+# See the commands available in this app
+php artisan list
 
-# Run tests
+# Run the test suite
 composer test
-
-# Check code standards
-composer cs-check
-
-# Fix code standards
-composer cs-fix
 ```
+
+If you change a route or view and do not see the change in your browser, check that the development server is still running and reload the page. If a command is not recognized, run it from the application directory and confirm the project dependencies were installed.
+
+## Where to go next
+
+Machinjiri includes tools for building beyond this first page:
+
+- **Routing:** HTTP methods, route parameters, groups, middleware, named routes, and CORS
+- **Views:** layouts, sections, includes, and template directives
+- **Database:** query builder, migrations, schema builder, seeders, and factories
+- **Security:** sessions, cookies, password hashing, CSRF protection, and encryption
+- **Queues and scheduling:** background jobs, queue workers, and persistent scheduled tasks
+- **Integrations:** webhooks, SMS transports, mail, Redis, and FTP storage
+
+Explore the generated `app/`, `config/`, `database/`, `resources/`, and `routes/` directories as you build. Keep credentials and environment-specific settings in your `.env` file rather than hard-coding them in controllers or views.
+
+## System requirements
+
+- **PHP:** 8.4 or newer (`^8.4` in Composer)
+- **Composer:** 2.0 or newer
+- **Required PHP extensions:** PDO, cURL, JSON, and OpenSSL
+- **Optional extensions:** FTP for FTP filesystem support; LDAP for LDAP integration
+- **Database options:** MySQL 5.7+, PostgreSQL 10+, or SQLite 3+
+
+The database is only needed when your app uses database-backed features.
+
+## About Machinjiri 2.3.0
+
+Version 2.3.0 focuses on more reliable queue processing, stronger security APIs, and a leaner framework surface. This release also updates terminal tooling and aligns the documentation with features included in the package.
+
+- Refined queue job contracts, drivers, retries, and worker commands
+- Added configurable password policies and password hashing options
+- Added configurable encryption, including authenticated AES-GCM support
+- Strengthened CSRF token handling
+- Removed bundled Bootstrap UI components and framework-specific testing helpers; use the UI library and PHPUnit setup that fit your application
 
 ## What’s New in 2.3.0
 
@@ -1424,30 +244,17 @@ Highlights from this release include:
 
 ## License
 
-This project is licensed under a **proprietary license** - see the [LICENSE](LICENSE) file for details.
+Machinjiri is distributed under a **proprietary license**. See [LICENSE](LICENSE) for details.
 
-## Support
+## Help and support
 
-- **GitHub Issues**: [Report bugs and request features](https://github.com/mlangeni/machinjiri/issues)
-- **Discussions**: [Ask questions and share ideas](https://github.com/mlangeni/machinjiri/discussions)
-- **Email**: precious.lyson@gmail.com
-
----
+- [Report a bug or request a feature](https://github.com/mlangeni/machinjiri/issues)
+- [Ask a question or share ideas](https://github.com/mlangeni/machinjiri/discussions)
+- Email: [precious.lyson@gmail.com](mailto:precious.lyson@gmail.com)
 
 ## Authors
 
-- **Precious Lyson** - [GitHub](https://github.com/precious-lyson) | [Email](mailto:precious.lyson@gmail.com)
-- **Mlangeni Group** - [Website](https://www.facebook.com/profile.php?id=61590389113242)
+- **Precious Lyson** — [GitHub](https://github.com/precious-lyson)
+- **Mlangeni Group** — [Website](https://www.facebook.com/profile.php?id=61590389113242)
 
-## Acknowledgments
-
-- Built on modern PHP 8.4+ features
-- Community contributions and feedback
-
----
-
-Full Documentation: 
-
-**Built with ❤️ by the Machinjiri Team**
-
-*Made for developers, by developers.*
+**Built with care by the Machinjiri team.**

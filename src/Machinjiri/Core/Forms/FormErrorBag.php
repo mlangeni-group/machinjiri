@@ -1,6 +1,8 @@
 <?php
 namespace Mlangeni\Machinjiri\Core\Forms;
 
+use Mlangeni\Machinjiri\Core\Authentication\Session;
+
 class FormErrorBag
 {
     private array $errors = [];

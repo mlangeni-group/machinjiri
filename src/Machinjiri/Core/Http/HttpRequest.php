@@ -29,6 +29,7 @@ class HttpRequest
     private array $headers;
     private string $body;
     private array $attributes = [];
+    private array $files = [];
 
     private HttpClient $client;
     private ?Session $session;
@@ -63,6 +64,7 @@ class HttpRequest
         $this->cookie      = $cookie;
         $this->oauth       = $oauth;
         $this->initializeClient();
+        $this->files = $_FILES;
     }
 
     public static function createFromGlobals(): self
@@ -462,6 +464,11 @@ class HttpRequest
         return $this->postData;
     }
 
+    public function getFiles(): array
+    {
+        return $this->files;
+    }
+
     public function getPostParam(string $key, $default = null)
     {
         return $this->postData[$key] ?? $default;
@@ -791,7 +798,7 @@ class HttpRequest
 
     public function all(): array
     {
-        return array_merge($this->queryParams, $this->postData);
+        return array_merge($this->queryParams, $this->postData, $this->files);
     }
 
     public function input(string $key, $default = null)
