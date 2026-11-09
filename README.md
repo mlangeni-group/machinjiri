@@ -227,6 +227,21 @@ Version 2.3.0 focuses on more reliable queue processing, stronger security APIs,
 - Strengthened CSRF token handling
 - Removed bundled Bootstrap UI components and framework-specific testing helpers; use the UI library and PHPUnit setup that fit your application
 
+## What’s New in 2.3.0
+
+Machinjiri `2.3.0` focuses on more reliable queue processing, stronger security APIs, and a leaner framework surface. The release also updates terminal tooling and aligns the documentation with APIs and features currently included in the package.
+
+Highlights from this release include:
+
+- Refined queue job contracts, drivers, retries, and worker commands, with more specific exceptions for queue, job, driver, processor, and terminal failures
+- Added configurable password policies and validation, with password hashing and verification through the security APIs
+- Expanded password hashing with bcrypt and Argon2 options, optional pre-hashing and pepper support, and verify-and-rehash handling
+- Made encryption configurable by cipher, including authenticated AES-GCM support and validated IV/tag settings
+- Strengthened CSRF token handling with expiration, timing-safe checks, configurable cookie options, and a double-submit cookie flow
+- Updated terminal command handling and form error access for clearer behavior
+- Moved PHP keyword lists to `Core\Artisans\Helpers\Keywords`
+- Removed the bundled Bootstrap UI components and the framework-provided testing helpers; use your preferred UI library and PHPUnit directly
+
 ## License
 
 Machinjiri is distributed under a **proprietary license**. See [LICENSE](LICENSE) for details.
