@@ -3,7 +3,7 @@
 Machinjiri is a PHP framework for building web applications, APIs, and internal tools. This guide is written as a first project tutorial: install Machinjiri, run an app, add a route, and render a page.
 
 ![Machinjiri PHP Framework](https://img.shields.io/badge/Machinjiri-PHP_Framework-6C2EB9?logo=php&logoColor=white)
-![Version 2.3.0](https://img.shields.io/badge/Version-2.3.0-2563EB)
+![Version 2.3.1](https://img.shields.io/badge/Version-2.3.1-2563EB)
 ![PHP ^8.4](https://img.shields.io/badge/PHP-%5E8.4-777BB4?logo=php&logoColor=white)
 ![Composer 2.0+](https://img.shields.io/badge/Composer-2.0%2B-885630?logo=composer&logoColor=white)
 ![Proprietary license](https://img.shields.io/badge/License-Proprietary-lightgrey)
@@ -217,9 +217,9 @@ Explore the generated `app/`, `config/`, `database/`, `resources/`, and `routes/
 
 The database is only needed when your app uses database-backed features.
 
-## About Machinjiri 2.3.0
+## About Machinjiri 2.3.1
 
-Version 2.3.0 focuses on more reliable queue processing, stronger security APIs, and a leaner framework surface. This release also updates terminal tooling and aligns the documentation with features included in the package.
+Version 2.3.1 focuses on more reliable queue processing, stronger security APIs, and a leaner framework surface. This release also updates terminal tooling and aligns the documentation with features included in the package.
 
 - Refined queue job contracts, drivers, retries, and worker commands
 - Added configurable password policies and password hashing options

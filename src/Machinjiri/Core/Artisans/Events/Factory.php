@@ -3,7 +3,7 @@
 namespace Mlangeni\Machinjiri\Core\Artisans\Events;
 
 use Mlangeni\Machinjiri\Core\Artisans\Logging\LoggerFactory;
-use Mlangeni\Machinjiri\Core\Components\UUID\OTP\OTPGenerator as EventIdGenerator;
+use Mlangeni\Machinjiri\Core\Components\UUID\OTP\OtpGenerator as EventIdGenerator;
 
 /**
  * Factory – the framework's SYSTEM EVENT LOGGER.
