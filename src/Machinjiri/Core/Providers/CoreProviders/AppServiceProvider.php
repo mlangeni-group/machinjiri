@@ -13,27 +13,27 @@
 
 namespace Mlangeni\Machinjiri\Core\Providers\CoreProviders;
 
-use Mlangeni\Machinjiri\Core\Providers\ServiceProvider;
-use Mlangeni\Machinjiri\Core\Http\{HttpRequest, HttpResponse, HttpClient};
-use Mlangeni\Machinjiri\Core\Authentication\{Session, Cookie, AuthManager};
-use Mlangeni\Machinjiri\Core\Artisans\Logging\Logger;
-use Mlangeni\Machinjiri\Core\Artisans\Events\{EventListener, Event};
-use Mlangeni\Machinjiri\Core\Debug\Debugger;
-use Mlangeni\Machinjiri\Core\FileSystem\FileSystemManager;
-use Mlangeni\Machinjiri\Core\FileSystem\Adapters\{LocalAdapter, FtpAdapter};
 use Mlangeni\Machinjiri\Core\Artisans\Caching\CacheManager;
-use Mlangeni\Machinjiri\Core\Transport\Mail\MailManager;
-use Mlangeni\Machinjiri\Core\Transport\SMS\SMSManager;
-use Mlangeni\Machinjiri\Core\Security\Tokens\{CSRFToken, CookieOptions};
-use Mlangeni\Machinjiri\Core\Routing\RoutingConfig;
-use Mlangeni\Machinjiri\Core\Security\Hashing\Hasher;
-use Mlangeni\Machinjiri\Core\Security\Encryption\Bangwe;
+use Mlangeni\Machinjiri\Core\Artisans\Events\{EventListener, Event};
+use Mlangeni\Machinjiri\Core\Artisans\Logging\Logger;
+use Mlangeni\Machinjiri\Core\Authentication\{Session, Cookie, AuthManager};
 use Mlangeni\Machinjiri\Core\Authentication\ThirdParty\ThirdPartyAuth;
-use Mlangeni\Machinjiri\Core\Exceptions\MachinjiriException;
+use Mlangeni\Machinjiri\Core\Components\LDAP\{Manager as LDAPManager, Connection as LDAPConnection, EntryManager};
 use Mlangeni\Machinjiri\Core\Components\Network\Tools\{Manager, Scanner, Monitor, NetworkConfig};
 use Mlangeni\Machinjiri\Core\Components\Webhooks\{WebhookSubscriptionManager, WebhookManager};
-use Mlangeni\Machinjiri\Core\Components\LDAP\{Manager as LDAPManager, Connection as LDAPConnection, EntryManager};
+use Mlangeni\Machinjiri\Core\Debug\Debugger;
+use Mlangeni\Machinjiri\Core\Exceptions\MachinjiriException;
+use Mlangeni\Machinjiri\Core\FileSystem\Adapters\{LocalAdapter, FtpAdapter};
+use Mlangeni\Machinjiri\Core\FileSystem\FileSystemManager;
+use Mlangeni\Machinjiri\Core\Http\{HttpRequest, HttpResponse, HttpClient};
 use Mlangeni\Machinjiri\Core\Performance\Insight\Insight;
+use Mlangeni\Machinjiri\Core\Providers\ServiceProvider;
+use Mlangeni\Machinjiri\Core\Routing\RoutingConfig;
+use Mlangeni\Machinjiri\Core\Security\Encryption\Bangwe;
+use Mlangeni\Machinjiri\Core\Security\Hashing\Hasher;
+use Mlangeni\Machinjiri\Core\Security\Tokens\{CSRFToken, CookieOptions};
+use Mlangeni\Machinjiri\Core\Transport\Mail\MailManager;
+use Mlangeni\Machinjiri\Core\Transport\SMS\SMSManager;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -333,7 +333,6 @@ class AppServiceProvider extends ServiceProvider
             'sms.manager'                   => SMSManager::class,
             'logger'                        => Logger::class,
             'routing.config'                => RoutingConfig::class,
-            'auth.manager'                  => AuthManager::class,
             'security.hasher'               => Hasher::class,
             'security.bangwe'               => Bangwe::class,
             'webhook.manager'               => WebhookManager::class,
@@ -346,8 +345,6 @@ class AppServiceProvider extends ServiceProvider
 
     private function registerTransportServices()
     {
-        // MailManager is responsible for sending emails; it creates its own logger
-        // and event listener internally, and uses a queue dispatcher if available.
         $this->singleton(MailManager::class, function ($app) {
             $log = "mailer-transport";
             return new MailManager(
@@ -362,10 +359,11 @@ class AppServiceProvider extends ServiceProvider
             );
         });
 
-        // SMSManager is responsible for sending SMS messages; it uses the SMS config.
-        $this->singleton(SMSManager::class, function ($app) {
+        // -------------------- SMS Transport --------------------
+        $this->app->singleton(SMSManager::class, function ($app) {
             return SMSManager::fromConfig($app->configurations['sms'] ?? [], $app);
         });
+        
     }
 
     private function registerAuthenticationServices()

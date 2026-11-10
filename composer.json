@@ -18,19 +18,22 @@
   ],
   "require": {
     "php": "^8.4",
-    "phpmailer/phpmailer": "^7.0.1",
+    "phpmailer/phpmailer": "^7.1",
     "symfony/console": "^5.3",
     "symfony/filesystem": "^5.3",
     "symfony/process": "^5.3",
-    "predis/predis" : "^3.3.0",
-    "dragonmantank/cron-expression": "^3.6.0",
     "africastalking/africastalking": "^3.0.2"
   },
   "require-dev": {
+    "machinjiri/advocate":"^1.0",
     "phpunit/phpunit": "^10.0",
     "mockery/mockery": "^1.5",
     "fakerphp/faker": "^1.20",
     "brianium/paratest": "*"
+  },
+  "suggest": {
+    "predis/predis" : "^3.3.0",
+    "dragonmantank/cron-expression": "^3.6.0"
   },
   "autoload": {
     "psr-4": {
@@ -51,14 +54,5 @@
   },
   "minimum-stability": "stable",
   "prefer-stable": true,
-  "keywords": [
-    "mlangeni",
-    "machinjiri",
-    "preciouslyson",
-    "framework",
-    "php",
-    "lightweight",
-    "web",
-    "development"
-  ]
+  "keywords": ["mlangeni", "machinjiri", "preciouslyson", "framework", "php", "lightweight", "web", "development"]
 }

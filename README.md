@@ -227,6 +227,9 @@ Version 2.3.0 focuses on more reliable queue processing, stronger security APIs,
 - Strengthened CSRF token handling
 - Removed bundled Bootstrap UI components and framework-specific testing helpers; use the UI library and PHPUnit setup that fit your application
 
+## Documentation
+The Full Documentation coming soon.
+
 ## License
 
 Machinjiri is distributed under a **proprietary license**. See [LICENSE](LICENSE) for details.
