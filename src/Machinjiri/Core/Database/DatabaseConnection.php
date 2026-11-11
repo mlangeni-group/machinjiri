@@ -92,7 +92,7 @@ class DatabaseConnection
      * For PDO drivers, returns a connection borrowed from the pool.
      *
      * @return PDO|Client
-     * @throws MachinjiriException
+     * @throws DatabaseException
      */
     public static function getInstance()
     {
@@ -381,7 +381,7 @@ class DatabaseConnection
                     'driverOptions' => self::$config['options'] ?? []
                 ]);
                 self::$mongoConnection = $mongoAdapter->connect();
-            } catch (MachinjiriException $e) {
+            } catch (DatabaseException $e) {
                 $e->show();
             }
 

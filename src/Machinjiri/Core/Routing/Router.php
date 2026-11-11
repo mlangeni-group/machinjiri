@@ -456,9 +456,20 @@ class Router
         }
 
         if ($result === null || is_object($result)) {
-            $this->httpResponse->setStatusCode(204);
+
+            if ($this->httpRequest->isAjax() || $this->expectsJson()) {
+                $this->httpResponse->setJsonBody([
+                    "Error" => true,
+                    "code" => 204,
+                    "message" => "No Content"
+                ]);
+                $this->httpResponse->send();
+                return;
+            }
+
             $this->httpResponse->setBody($this->buitInErrorPage(204, "No Content", "There was no content returned from your request"));
             $this->httpResponse->send();
+            return;
         }
 
     }
@@ -646,139 +657,173 @@ class Router
 
     public function buitInErrorPage(int $code, string $message, ?string $description = null): string
     {
-         $appName = ucfirst(env('APP_NAME', 'Machinjiri'));
-         return <<<HTML
+        $appName = htmlspecialchars(ucfirst(env('APP_NAME', 'Machinjiri')), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        $message = htmlspecialchars($message, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        $description = htmlspecialchars($description ?? '', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        return <<<HTML
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>{$appName} - {$code} Error</title>
+    <meta name="color-scheme" content="light dark" />
+    <title>{$code} · {$appName}</title>
     <style>
-        *,
-        *::before,
-        *::after {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-
         :root {
-            --primary: #6D5BD0;
-            --dark: #5A48B8;
-            --light: #8877E8;
-            --soft: #DDD7F9;
-            --secondary: #F2EFFE;
-            --medium: #CBC2F0;
-            --subtle: #E9E6FA;
-            --deep: #4B3E9E;
-            --lilac: #B9AFF0;
-            --warm: #FFFAE6;
-            --text: #4b3e9e;
-            --bg: #dddddd;
-            --card-bg: #faf9ff;
-            --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
-            --code-font: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
-            --transition: 0.2s ease-in-out;
+            color-scheme: light;
+            --bg: #f5f3ff;
+            --panel: rgba(255, 255, 255, 0.82);
+            --panel-strong: #ffffff;
+            --border: rgba(109, 91, 208, 0.14);
+            --primary: #6d5bd0;
+            --primary-strong: #4d3eb6;
+            --primary-soft: #efeaff;
+            --text: #1f2430;
+            --muted: #5f6676;
+            --danger: #ef4444;
+            --shadow: 0 22px 50px rgba(44, 34, 87, 0.14);
+            --radius: 22px;
+            --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+            --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         }
 
         @media (prefers-color-scheme: dark) {
             :root {
-                --primary: #8877E8;
-                --dark: #9D8FF0;
-                --light: #6D5BD0;
-                --soft: #4A3F7A;
-                --secondary: #2D2746;
-                --medium: #423B63;
-                --subtle: #5B4E9E;
-                --deep: #B9AFF0;
-                --lilac: #CFC6F0;
-                --warm: #F2E9FF;
-                --bg: #16141f !important;
-                --card-bg: #1e1b2b;
-                --text: #efedf7;
+                color-scheme: dark;
+                --bg: #120f1d;
+                --panel: rgba(22, 24, 37, 0.9);
+                --panel-strong: #181b2a;
+                --border: rgba(173, 160, 255, 0.16);
+                --primary: #a78bfa;
+                --primary-strong: #c4b5fd;
+                --primary-soft: rgba(167, 139, 250, 0.12);
+                --text: #edf2ff;
+                --muted: #a4acc5;
+                --danger: #f87171;
+                --shadow: 0 22px 50px rgba(10, 8, 20, 0.55);
             }
         }
 
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+        }
+
+        html { min-height: 100%; }
+
         body {
-            background: var(--bg);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-family: var(--font-family);
-            color: var(--text);
-            padding: 1.5rem;
+            display: grid;
+            min-height: 100vh;
             margin: 0;
-            transition: background var(--transition), color var(--transition);
+            padding: 24px;
+            background:
+                radial-gradient(circle at top left, rgba(109, 91, 208, 0.14), transparent 32%),
+                linear-gradient(180deg, #f7f7ff 0%, var(--bg) 100%);
+            color: var(--text);
+            font-family: var(--sans);
+        }
+
+        @media (prefers-color-scheme: dark) {
+            body {
+                background:
+                    radial-gradient(circle at top left, rgba(167, 139, 250, 0.18), transparent 32%),
+                    linear-gradient(180deg, #120f1d 0%, #171824 100%);
+            }
+        }
+
+        .error-shell {
+            width: min(100%, 620px);
+            margin: 0 auto;
         }
 
         .error-container {
-            background: var(--card-bg);
-            max-width: 600px;
-            width: 100%;
-            border: 1px solid var(--lilac);
+            overflow: hidden;
+            padding: clamp(24px, 6vw, 42px);
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
             box-shadow: var(--shadow);
-            padding: 2.5rem 2.5rem 2rem;
-            transition: background var(--transition), box-shadow var(--transition);
-            border: 1px solid var(--border-color);
+            backdrop-filter: blur(12px);
         }
 
         .error-header {
             display: flex;
-            align-items: baseline;
+            align-items: center;
             justify-content: space-between;
-            flex-wrap: wrap;
-            gap: 0.75rem 1rem;
-            margin-bottom: 1.5rem;
+            gap: 16px;
+            margin-bottom: 34px;
         }
 
-        .error-code {
-            font-size: 4rem;
+        .error-label {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--muted);
+            font-size: 0.76rem;
             font-weight: 700;
-            line-height: 1;
-            color: var(--accent);
-            letter-spacing: -0.04em;
-            font-family: var(--code-font);
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+        }
+
+        .error-label::before {
+            width: 8px;
+            height: 8px;
+            background: var(--danger);
+            border-radius: 50%;
+            content: "";
         }
 
         .app-name {
-            font-size: 0.875rem;
-            font-weight: 500;
-            color: var(--text-muted);
-            background: var(--bg);
-            padding: 0.4rem 1rem;
-            border: 1px solid var(--border-color);
+            max-width: 55%;
+            overflow: hidden;
+            padding: 7px 12px;
+            color: var(--primary-strong);
+            background: var(--primary-soft);
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            font-size: 0.78rem;
+            font-weight: 650;
+            text-overflow: ellipsis;
             white-space: nowrap;
         }
 
+        .error-code {
+            display: block;
+            margin-bottom: 18px;
+            color: var(--primary);
+            font-family: var(--mono);
+            font-size: clamp(4.5rem, 18vw, 7rem);
+            font-weight: 750;
+            letter-spacing: -0.09em;
+            line-height: 0.9;
+        }
+
         .error-message {
-            font-size: 1.5rem;
-            font-weight: 600;
-            margin: 0.25rem 0 0.75rem 0;
-            color: var(--text-primary);
+            margin: 0 0 12px;
+            color: var(--text);
+            font-size: clamp(1.45rem, 5vw, 2rem);
+            font-weight: 700;
+            letter-spacing: -0.035em;
+            line-height: 1.2;
         }
 
         .error-description {
-            font-size: 1rem;
-            line-height: 1.6;
-            color: var(--text-muted);
-            margin: 0 0 2rem 0;
-            padding: 1rem 0 0 0;
-            border-top: 1px solid var(--border-color);
+            margin: 0;
+            padding-top: 18px;
+            color: var(--muted);
+            border-top: 1px solid var(--border);
+            font-size: 0.98rem;
+            line-height: 1.7;
+            overflow-wrap: anywhere;
         }
 
-        /* ----- Responsive ----- */
         @media (max-width: 480px) {
-            .error-container {
-                padding: 1.75rem 1.25rem 1.5rem;
-            }
+            body { padding: 16px; }
 
-            .error-code {
-                font-size: 3rem;
-            }
-
-            .error-message {
-                font-size: 1.25rem;
+            .error-header {
+                align-items: flex-start;
+                margin-bottom: 28px;
             }
         }
 
@@ -786,23 +831,23 @@ class Router
             *,
             *::before,
             *::after {
-                transition-duration: 0.01ms !important;
-                animation-duration: 0.01ms !important;
+                scroll-behavior: auto !important;
             }
         }
     </style>
 </head>
 <body>
-    <div class="error-container" role="alert" aria-live="assertive">
-        <div class="error-header">
+    <main class="error-shell">
+        <section class="error-container" role="alert" aria-live="assertive">
+            <header class="error-header">
+                <span class="error-label">Request error</span>
+                <span class="app-name">{$appName}</span>
+            </header>
             <span class="error-code">{$code}</span>
-            <span class="app-name">{$appName}</span>
-        </div>
-
-        <h1 class="error-message">{$message}</h1>
-        <p class="error-description">{$description}</p>
-
-    </div>
+            <h1 class="error-message">{$message}</h1>
+            <p class="error-description">{$description}</p>
+        </section>
+    </main>
 </body>
 </html>
 HTML;
