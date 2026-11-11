@@ -228,7 +228,8 @@ Version 2.3.2 focuses on more reliable queue processing, stronger security APIs,
 - Removed bundled Bootstrap UI components and framework-specific testing helpers; use the UI library and PHPUnit setup that fit your application
 
 ## Documentation
-The Full Documentation coming soon.
+
+The beginner-to-advanced wiki is available in [Machinjiri Wiki Documentation](https://github.com/mlangeni-group/machinjiri/wiki/). Start with [Getting Started](https://github.com/mlangeni-group/machinjiri/wiki/Getting-Started), then follow the topic links from its home page.
 
 ## License
 
@@ -244,5 +245,3 @@ Machinjiri is distributed under a **proprietary license**. See [LICENSE](LICENSE
 
 - **Precious Lyson** — [GitHub](https://github.com/precious-lyson)
 - **Mlangeni Group** — [Website](https://www.facebook.com/profile.php?id=61590389113242)
-
-**Built with care by the Machinjiri team.**
