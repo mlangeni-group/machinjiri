@@ -529,6 +529,19 @@ final class Dumper
         font-size: 12px;
     }
 }
+.machinjiri-dump.cozy-dump pre { margin: 0; white-space: pre-wrap; word-wrap: break-word; font-family: inherit; }
+.machinjiri-dump .dump-null     { color: #52413c; font-weight: 700; }
+.machinjiri-dump .dump-bool     { color: #ce402e; font-weight: 700; }
+.machinjiri-dump .dump-int,
+.machinjiri-dump .dump-float    { color: #54748d; }
+.machinjiri-dump .dump-string   { color: #4a8139; }
+.machinjiri-dump .dump-array    { color: #c29054; font-weight: 700; }
+.machinjiri-dump .dump-object   { color: #7a2e31; font-weight: 700; }
+.machinjiri-dump .dump-resource { color: #9B6B9E; }
+.machinjiri-dump .dump-key      { color: #132524b4; }
+.machinjiri-dump .dump-property { color: #88470e; }
+.machinjiri-dump .dump-unknown  { color: #888; }
+.machinjiri-dump em             { color: #b33; font-style: italic; }
 </style>
 CSS;
     }
