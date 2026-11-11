@@ -219,9 +219,12 @@ final class Dumper
         }
 
         self::$seenObjects = [];
-        echo '<div class="machinjiri-dump cozy-dump"><pre>';
+        echo '<section class="machinjiri-dump cozy-dump" aria-label="Variable dump">';
+        echo '<div class="dump-header"><span class="dump-mark" aria-hidden="true">&gt;</span>';
+        echo '<span class="dump-title">Machinjiri Dumper</span><span class="dump-badge">PHP</span></div>';
+        echo '<pre class="dump-content">';
         self::formatHtml($var, 0);
-        echo '</pre></div>' . "\n";
+        echo '</pre></section>' . "\n";
     }
 
     private static function formatHtml(mixed $var, int $depth = 0): void
@@ -413,34 +416,119 @@ final class Dumper
         return <<<CSS
 <style>
 .machinjiri-dump.cozy-dump {
-    --md-bg: #dedede;
-    --md-color: #161922;
-    --md-int: #54748d;
-    --md-dark: #cccaca;
-    background: var(--md-dark);
-    color: var(--md-color);
-    font-family: 'SF Mono', Monaco, Menlo, Consolas, 'Courier New', monospace;
-    font-size: 14px;
-    line-height: 1.6;
-    padding: 1rem 1.2rem;
-    margin: .5rem 0;
-    overflow-x: auto;
-    border-left: 4px solid rgb(52, 52, 56);
-    backdrop-filter: blur(2px);
+    --dump-panel: rgba(255, 255, 255, 0.88);
+    --dump-header: rgba(109, 91, 208, 0.04);
+    --dump-border: rgba(109, 91, 208, 0.16);
+    --dump-text: #1f2430;
+    --dump-muted: #5f6676;
+    --dump-primary: #6d5bd0;
+    --dump-primary-strong: #4d3eb6;
+    --dump-primary-soft: #efeaff;
+    --dump-string: #26734d;
+    --dump-number: #3866a8;
+    --dump-key: #6554b8;
+    --dump-property: #a45b20;
+    --dump-danger: #c83d4b;
+    --dump-shadow: 0 14px 36px rgba(44, 34, 87, 0.12);
+    margin: 1rem 0;
+    overflow: hidden;
+    color: var(--dump-text);
+    background: var(--dump-panel);
+    border: 1px solid var(--dump-border);
+    border-radius: 16px;
+    box-shadow: var(--dump-shadow);
+    backdrop-filter: blur(10px);
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 13px;
+    line-height: 1.65;
 }
-.machinjiri-dump.cozy-dump pre { margin: 0; white-space: pre-wrap; word-wrap: break-word; font-family: inherit; }
-.machinjiri-dump .dump-null     { color: #52413c; font-weight: 700; }
-.machinjiri-dump .dump-bool     { color: #ce402e; font-weight: 700; }
+.machinjiri-dump.cozy-dump .dump-header {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    min-height: 46px;
+    padding: 9px 16px;
+    background: var(--dump-header);
+    border-bottom: 1px solid var(--dump-border);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+.machinjiri-dump.cozy-dump .dump-mark {
+    display: grid;
+    width: 23px;
+    height: 23px;
+    place-items: center;
+    color: #fff;
+    background: linear-gradient(135deg, var(--dump-primary), var(--dump-primary-strong));
+    border-radius: 7px;
+    font-size: 15px;
+    font-weight: 700;
+}
+.machinjiri-dump.cozy-dump .dump-title {
+    color: var(--dump-text);
+    font-size: 0.84rem;
+    font-weight: 650;
+    letter-spacing: 0.01em;
+}
+.machinjiri-dump.cozy-dump .dump-badge {
+    margin-left: auto;
+    padding: 4px 9px;
+    color: var(--dump-primary-strong);
+    background: var(--dump-primary-soft);
+    border: 1px solid var(--dump-border);
+    border-radius: 999px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+.machinjiri-dump.cozy-dump .dump-content {
+    max-height: 70vh;
+    margin: 0;
+    padding: 16px 18px;
+    overflow-x: auto;
+    color: inherit;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    font: inherit;
+}
+.machinjiri-dump .dump-null     { color: var(--dump-muted); font-weight: 700; }
+.machinjiri-dump .dump-bool     { color: var(--dump-danger); font-weight: 700; }
 .machinjiri-dump .dump-int,
-.machinjiri-dump .dump-float    { color: #54748d; }
-.machinjiri-dump .dump-string   { color: #4a8139; }
-.machinjiri-dump .dump-array    { color: #c29054; font-weight: 700; }
-.machinjiri-dump .dump-object   { color: #7a2e31; font-weight: 700; }
-.machinjiri-dump .dump-resource { color: #9B6B9E; }
-.machinjiri-dump .dump-key      { color: #132524b4; }
-.machinjiri-dump .dump-property { color: #88470e; }
-.machinjiri-dump .dump-unknown  { color: #888; }
-.machinjiri-dump em             { color: #b33; font-style: italic; }
+.machinjiri-dump .dump-float    { color: var(--dump-number); }
+.machinjiri-dump .dump-string   { color: var(--dump-string); }
+.machinjiri-dump .dump-array    { color: var(--dump-primary); font-weight: 700; }
+.machinjiri-dump .dump-object   { color: var(--dump-primary-strong); font-weight: 700; }
+.machinjiri-dump .dump-resource { color: #8b5a9f; }
+.machinjiri-dump .dump-key      { color: var(--dump-key); }
+.machinjiri-dump .dump-property { color: var(--dump-property); }
+.machinjiri-dump .dump-unknown  { color: var(--dump-muted); }
+.machinjiri-dump em             { color: var(--dump-danger); font-style: italic; }
+
+@media (prefers-color-scheme: dark) {
+    .machinjiri-dump.cozy-dump {
+        --dump-panel: rgba(22, 24, 37, 0.92);
+        --dump-header: rgba(18, 22, 35, 0.9);
+        --dump-border: rgba(173, 160, 255, 0.16);
+        --dump-text: #edf2ff;
+        --dump-muted: #a4acc5;
+        --dump-primary: #a78bfa;
+        --dump-primary-strong: #c4b5fd;
+        --dump-primary-soft: rgba(167, 139, 250, 0.12);
+        --dump-string: #86d6a5;
+        --dump-number: #93c5fd;
+        --dump-key: #c4b5fd;
+        --dump-property: #f0b37e;
+        --dump-danger: #f87171;
+        --dump-shadow: 0 18px 40px rgba(10, 8, 20, 0.5);
+    }
+}
+
+@media (max-width: 560px) {
+    .machinjiri-dump.cozy-dump .dump-content {
+        padding: 13px;
+        font-size: 12px;
+    }
+}
 </style>
 CSS;
     }

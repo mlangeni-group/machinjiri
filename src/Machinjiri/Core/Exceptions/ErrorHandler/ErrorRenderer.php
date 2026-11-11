@@ -397,35 +397,24 @@ class ErrorRenderer
             'peak_memory' => memory_get_peak_usage(true) / 1024 / 1024 . ' MB',
             'PHP_VERSION' => PHP_VERSION
         ];
-        
+
         $errorClass = get_class($exception);
         $errorMessage = htmlspecialchars($exception->getMessage(), ENT_QUOTES, 'UTF-8');
         $errorFile = htmlspecialchars($exception->getFile(), ENT_QUOTES, 'UTF-8');
         $errorLine = $exception->getLine();
         $errorCode = $exception->getCode();
         $errorTrace = $exception->getTrace();
-        
-        // Get code snippet
+
         $codeSnippet = self::getCodeSnippet($errorFile, $errorLine);
-        
-        // Get request data
         $requestData = self::getRequestData();
-        
-        // Get environment data
         $environmentData = self::getEnvironmentData();
-        
-        // Get session data
         $sessionData = self::getSessionData();
-        
-        // Get registered routes
         $routesData = self::getRoutesData();
-        
-        // Get recent logs
         $logsData = self::getRecentLogs();
 
         $showTrace = self::$detailLevel >= 1;
         $showEnvironment = self::$detailLevel >= 2;
-        
+
         $appName = ucfirst(getenv("APP_NAME") ?? "Machinjiri");
         $appVersion = getenv("APP_VERSION") ?? "1.0.0";
         $environment = getenv("APP_ENV") ?? "development";
@@ -433,488 +422,507 @@ class ErrorRenderer
         echo <<<HTML
 <!DOCTYPE html>
 <html lang="en">
-<head> 
+<head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{$appName} - Error/Exception</title>
+    <title>{$appName} - Error Details</title>
     <style>
         :root {
-            --primary: #6D5BD0;
-            --dark: #5A48B8;
-            --light: #8877E8;
-            --soft: #DDD7F9;
-            --secondary: #F2EFFE;
-            --medium: #CBC2F0;
-            --subtle: #E9E6FA;
-            --deep: #4B3E9E;
-            --lilac: #B9AFF0;
-            --warm: #FFFAE6;
-            --text: #4b3e9e;
-            --bg: #dddddd;
-            --card-bg: #faf9ff;
-            --shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
-        }
-
-        html {
-            scroll-behavior: smooth;
+            --bg: #f5f3ff;
+            --panel: rgba(255, 255, 255, 0.82);
+            --panel-strong: #ffffff;
+            --border: rgba(109, 91, 208, 0.14);
+            --primary: #6d5bd0;
+            --primary-strong: #4d3eb6;
+            --primary-soft: #efeaff;
+            --accent: #1f2937;
+            --text: #1f2430;
+            --muted: #5f6676;
+            --danger: #ef4444;
+            --shadow: 0 18px 40px rgba(50, 36, 94, 0.12);
+            --radius: 20px;
+            --mono: "SFMono-Regular", "Consolas", "Liberation Mono", "Menlo", monospace;
+            --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         }
 
         @media (prefers-color-scheme: dark) {
             :root {
-                --primary: #8877E8;
-                --dark: #9D8FF0;
-                --light: #6D5BD0;
-                --soft: #4A3F7A;
-                --secondary: #2D2746;
-                --medium: #423B63;
-                --subtle: #5B4E9E;
-                --deep: #B9AFF0;
-                --lilac: #CFC6F0;
-                --warm: #F2E9FF;
-                --bg: #16141f !important;
-                --card-bg: #1e1b2b;
-                --text: #efedf7;
+                --bg: #120f1d;
+                --panel: rgba(22, 24, 37, 0.88);
+                --panel-strong: #181b2a;
+                --border: rgba(173, 160, 255, 0.16);
+                --primary: #a78bfa;
+                --primary-strong: #8b5cf6;
+                --primary-soft: rgba(167, 139, 250, 0.12);
+                --accent: #f4f1ff;
+                --text: #edf2ff;
+                --muted: #a4acc5;
+                --danger: #f87171;
+                --shadow: 0 18px 40px rgba(10, 8, 20, 0.55);
             }
 
-            body.dark-mode .error-message { background: #3E332A; }
-            body.dark-mode .error-location { background: #3E3530; }
-            body.dark-mode .preformatted { background: #3A332C; }
-            body.dark-mode .btn-secondary { background: #4A4038; color: #F0DCC0; border-color: #6B5A4A; }
-
-            .app-info .environment {
-                border-color: var(--border) !important;
+            body {
+                background:
+                    radial-gradient(circle at top left, rgba(167, 139, 250, 0.18), transparent 30%),
+                    linear-gradient(180deg, #120f1d 0%, #171824 100%);
             }
 
-            .error-badge {
-                background: var(--bg) !important;
-                border-color: var(--border) !important;
-                color: var(--primary-dark) !important;
+            .panel,
+            .info-card,
+            .trace-item,
+            .preformatted {
+                border-color: var(--border);
             }
 
-            .error-message {
-                background: var(--bg) !important;
-            }
-            
-            .error-message h3 {
-                color: var(--primary-dark);
-            }
-            
-            .error-location {
-                background: var(--bg) !important;
-                color: var(--text) !important;
+            .location-bar,
+            .trace-item,
+            .preformatted,
+            .error-card {
+                background: rgba(18, 22, 35, 0.9);
             }
 
-            .trace-item {
-                background: var(--bg) !important;
-            }
-            
-            .trace-location {
-                color: var(--text) !important;
-                font-family: monospace;
-                font-size: 0.8rem;
-                margin-bottom: 0.3rem;
-            }
-            
-            .trace-file {
-                color: var(--text-light);
+            .status-pill,
+            .tab-button.active {
+                background: rgba(167, 139, 250, 0.12);
             }
         }
-        
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
+
+        * { box-sizing: border-box; }
+
+        html { scroll-behavior: smooth; }
+
         body {
-            background: var(--bg);
-            font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', 'Poppins', sans-serif;
-            color: var(--text);
-            line-height: 1.5;
+            margin: 0;
             min-height: 100vh;
-            padding: 2rem 1.3rem;
-            position: relative;
-        }
-        
-        .error-wrapper {
-            max-width: 100%;
-            margin: 0 auto;
-            position: relative;
-            z-index: 2;
-        }
-        
-        .error-header {
-            width: 100%;
-            padding: 1.5rem 2rem;
-            margin-bottom: 2rem;
-            border-bottom: 1px solid #a99cf5;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 1rem;
-            position: fixed;
-            z-index: inherit;
-            background: var(--card-bg);
-            left: 0;
-            right: 0;
-            top: 0;
-            max-hieght: 80px;
-            box-shadow: var(--shadow);
-        }
-        
-        .app-info h1 {
-            color: var(--dark);
-            margin-bottom: 0.25rem;
-            font-size: 1.6rem;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-        
-        .app-info .environment {
-            display: inline-block;
-            padding: 0.2rem 0.8rem;
-            border-radius: var(--radius-sm);
-            font-size: 0.75rem;
-            font-weight: 500;
-            color: var(--primary-dark);
-        }
-        
-        .error-badge {
-            color: var(--primary-dark);
-            padding: 0.5rem 1.2rem;
-            font-weight: 600;
-            font-size: 0.85rem;
-            border: 1px solid var(--primary-dark);
-            border-radius: var(--radius-sm);
-        }
-        
-        .main-error {
-            width: 100% !important;
-            display: flex;
-            justify-content: space-between;
-            flex-direction: row;
-            gap: 3px;
-            position: absolute;
-            top: calc(80px + 2rem);
+            font-family: var(--sans);
+            background:
+                radial-gradient(circle at top left, rgba(109, 91, 208, 0.12), transparent 30%),
+                linear-gradient(180deg, #f7f7ff 0%, #f0f3ff 100%);
+            color: var(--text);
         }
 
-        .sidebar {
-            display: flex;
-            flex-direction: column;
-            gap: 1.5rem;
-            width: 25%;
+        .error-shell {
+            max-width: 1320px;
+            margin: 0 auto;
+            padding: 32px 20px 48px;
         }
-        
-        .error-section {
-            width: 74%;
-            background: var(--card-bg);
-            border-radius: var(--radius);
-            padding: 1.6rem;
-            margin-bottom: 1.8rem;
-            border: 1px solid var(--border);
-            box-shadow: var(--shadow);
-        }
-        
-        .section-title {
-            color: var(--primary-dark);
-            font-size: 1.3rem;
-            margin-bottom: 1.2rem;
-            display: flex;
-            align-items: center;
-            gap: 0.7rem;
-            font-weight: 600;
-        }
-        
-        .error-message {
-            background: var(--bg);
-            border-left: 4px solid var(--primary);
-            border-right: 4px solid var(--primary);
-            padding: 1rem;
-            border-radius: var(--radius-sm);
-            margin-bottom: 1.5rem;
-        }
-        
-        .error-message h3 {
-            color: var(--primary-dark);
-            margin-bottom: 0.5rem;
-            font-size: 1.1rem;
-        }
-        
-        .error-location {
-            background: var(--bg);
-            padding: 0.8rem 1rem;
-            border-radius: var(--radius-sm);
-            font-family: 'SF Mono', 'Fira Code', monospace;
-            font-size: 0.85rem;
-            margin-bottom: 1.5rem;
-            color: #5E4B3A;
-            word-break: break-word;
-            white-space: normal;
-            overflow-wrap: break-word;
-        }
-        
-        .code-snippet {
-            background: #15181f;
-            border-radius: var(--radius-sm);
-            border: 1px solid var(--primary);
-            overflow: hidden;
-            margin-bottom: 1.5rem;
-            color: #CBBBA8;
-        }
-        
-        .code-header {
-            background: #0f1116;
-            padding: 0.7rem 1rem;
-            font-size: 0.8rem;
+
+        .topbar {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            color: #CBBBA8 !important;
+            gap: 16px;
+            margin-bottom: 26px;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .brand-mark {
+            width: 42px;
+            height: 42px;
+            border-radius: 14px;
+            display: grid;
+            place-items: center;
+            color: #fff;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--primary), var(--primary-strong));
+            box-shadow: var(--shadow);
+        }
+
+        .eyebrow {
+            font-size: 0.72rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--muted);
+            margin-bottom: 4px;
+        }
+
+        .brand h1 {
+            margin: 0;
+            font-size: clamp(1.35rem, 2vw, 2rem);
+            line-height: 1.1;
+            color: var(--accent);
+        }
+
+        .status-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            border-radius: 999px;
+            padding: 8px 14px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--primary-strong);
+            background: var(--primary-soft);
+            border: 1px solid rgba(109, 91, 208, 0.14);
+        }
+
+        .layout {
+            display: grid;
+            grid-template-columns: minmax(0, 2fr) minmax(280px, 0.9fr);
+            gap: 24px;
+            align-items: start;
+        }
+
+        .panel {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            backdrop-filter: blur(10px);
+        }
+
+        .panel-hero {
+            padding: 26px 26px 20px;
+        }
+
+        .hero-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 18px;
+            color: var(--muted);
+            font-size: 0.78rem;
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 7px 10px;
+            border-radius: 999px;
+            background: #fff4f4;
+            color: var(--danger);
+            border: 1px solid rgba(239, 68, 68, 0.16);
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+        }
+
+        .panel-hero h2 {
+            margin: 0 0 12px;
+            font-size: clamp(1.6rem, 3vw, 2.3rem);
+            line-height: 1.2;
+            color: var(--accent);
+        }
+
+        .subheading {
+            margin: 0;
+            color: var(--muted);
+            font-size: 0.98rem;
+        }
+
+        .subheading code {
+            font-family: var(--mono);
+            font-size: 0.9em;
+            background: rgba(109, 91, 208, 0.08);
+            border-radius: 8px;
+            padding: 2px 8px;
+            color: var(--primary-strong);
+        }
+
+        .location-bar {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 10px;
+            margin-top: 24px;
+            padding: 12px 14px;
+            border-radius: 12px;
+            background: rgba(109, 91, 208, 0.06);
+            color: var(--text);
+            border: 1px solid rgba(109, 91, 208, 0.1);
+            font-size: 0.86rem;
+        }
+
+        .location-bar .label {
+            font-weight: 700;
+            color: var(--primary-strong);
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            font-size: 0.72rem;
+        }
+
+        .location-bar strong {
+            color: var(--accent);
+        }
+
+        .code-snippet {
+            margin-top: 20px;
+            border: 1px solid rgba(15, 23, 42, 0.08);
+            border-radius: 14px;
+            overflow: hidden;
+            background: #0f172a;
+            color: #dfe7ff;
+        }
+
+        .code-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            padding: 11px 14px;
+            background: rgba(255,255,255,0.04);
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+            font-size: 0.76rem;
+            color: rgba(223, 231, 255, 0.85);
+        }
+
+        .copy-btn {
+            appearance: none;
+            border: 1px solid rgba(223, 231, 255, 0.18);
+            background: rgba(255,255,255,0.04);
+            color: #dfe7ff;
+            border-radius: 999px;
+            padding: 5px 10px;
+            font-size: 0.74rem;
+            cursor: pointer;
         }
 
         .code-wrapper {
             display: flex;
-            flex-direction: row;
-            justify-content: space-between;
+            overflow-x: auto;
         }
-        
+
         .code-line-numbers {
-            display: flex;
-            padding: 0.8rem 0;
-            font-family: monospace;
-            font-size: 0.75rem;
-        }
-        
-        .code-content {
-            padding: 0.8rem;
-            font-family: monospace;
-            font-size: 0.75rem;
-            overflow-x: auto;
-        }
-        
-        .line-number {
-            padding: 0 0.8rem;
+            padding: 16px 0;
+            background: rgba(255,255,255,0.02);
+            border-right: 1px solid rgba(255,255,255,0.08);
+            font-family: var(--mono);
+            font-size: 0.78rem;
+            line-height: 1.6;
+            color: rgba(223, 231, 255, 0.6);
+            min-width: 58px;
             text-align: right;
-            min-width: 45px;
-            color: #CBBBA8;
         }
-        
-        .line-error {
-            background: #262a35;
-            color: #CBBBA8;
+
+        .line-number {
+            padding: 0 12px;
         }
-        
-        .trace-item {
-            background: var(--bg);
-            border: 1px solid var(--border);
-            border-left: 4px solid var(--primary);
-            border-radius: var(--radius-sm);
-            padding: 1rem;
-            margin-bottom: 0.8rem;
+
+        .code-content {
+            flex: 1;
+            padding: 16px 16px 16px 10px;
+            font-family: var(--mono);
+            font-size: 0.78rem;
+            line-height: 1.6;
+            white-space: pre-wrap;
             overflow-x: auto;
         }
-        
-        .trace-location {
-            color: var(--primary-dark);
-            font-family: monospace;
-            font-size: 0.8rem;
-            margin-bottom: 0.3rem;
+
+        .line-error {
+            background: rgba(250, 204, 21, 0.12);
+            box-shadow: inset 2px 0 0 #fbbf24;
         }
-        
-        .trace-file {
-            color: var(--text-light);
-            font-size: 0.7rem;
+
+        .content-stack {
+            margin-top: 24px;
         }
-        
-        .info-card {
-            background: var(--card-bg);
-            backdrop-filter: blur(2px);
-            border-radius: var(--radius);
-            padding: 1.4rem;
-            border: 1px solid var(--border);
-            box-shadow: var(--shadow);
+
+        .section-title {
+            margin: 0 0 12px;
+            font-size: 1.1rem;
+            color: var(--accent);
         }
-        
-        .info-item {
-            margin-bottom: 0.8rem;
-            padding-bottom: 0.8rem;
-            border-bottom: 1px solid var(--border);
-        }
-        
-        .info-item:last-child {
-            margin-bottom: 0;
-            padding-bottom: 0;
-            border-bottom: none;
-        }
-        
-        .info-label {
-            font-size: 0.7rem;
-            color: var(--text-light);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: 0.2rem;
-        }
-        
-        .info-value {
-            font-weight: 500;
-            word-break: break-all;
-            font-size: 0.85rem;
-        }
-        
+
         .tabs {
             display: flex;
-            gap: 0.2rem;
+            flex-wrap: wrap;
+            gap: 8px;
+            padding-bottom: 6px;
+            margin-bottom: 14px;
             border-bottom: 1px solid var(--border);
-            margin-bottom: 1rem;
         }
-        
+
         .tab-button {
-            padding: 0.5rem 1.2rem;
-            background: none;
-            border: none;
-            border-bottom: 2px solid transparent;
+            border: 1px solid transparent;
+            background: transparent;
+            color: var(--muted);
+            padding: 8px 12px;
+            border-radius: 999px;
+            font-weight: 600;
             cursor: pointer;
-            font-weight: 500;
-            color: var(--text-light);
-            transition: var(--transition);
-            font-size: 0.85rem;
+            transition: all 0.2s ease;
         }
-        
-        .tab-button:hover {
-            color: var(--primary-dark);
-        }
-        
+
         .tab-button.active {
-            color: var(--primary-dark);
-            border-bottom-color: var(--primary);
+            color: var(--primary-strong);
+            background: var(--primary-soft);
+            border-color: rgba(109, 91, 208, 0.12);
         }
-        
+
         .tab-content {
             display: none;
         }
-        
+
         .tab-content.active {
             display: block;
         }
-        
+
+        .trace-list {
+            display: grid;
+            gap: 10px;
+        }
+
+        .trace-item {
+            background: rgba(109, 91, 208, 0.03);
+            border: 1px solid rgba(109, 91, 208, 0.08);
+            border-left: 4px solid var(--primary);
+            border-radius: 12px;
+            padding: 12px 14px;
+        }
+
+        .trace-location {
+            font-family: var(--mono);
+            font-size: 0.78rem;
+            color: var(--accent);
+            word-break: break-word;
+        }
+
+        .trace-file {
+            margin-top: 8px;
+            font-size: 0.72rem;
+            color: var(--muted);
+        }
+
         .preformatted {
-            background: #FEF9F4;
-            padding: 0.8rem;
-            border-radius: var(--radius-sm);
-            font-family: monospace;
-            font-size: 0.7rem;
+            background: rgba(17, 24, 39, 0.04);
+            border: 1px solid rgba(15, 23, 42, 0.08);
+            border-radius: 12px;
+            padding: 14px;
+            font-family: var(--mono);
+            font-size: 0.75rem;
+            line-height: 1.55;
             overflow-x: auto;
+            white-space: pre-wrap;
             max-height: 300px;
             overflow-y: auto;
+            color: var(--text);
+        }
+
+        .sidebar {
+            display: grid;
+            gap: 18px;
+        }
+
+        .info-card {
+            background: var(--panel-strong);
             border: 1px solid var(--border);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            padding: 20px 20px 14px;
         }
-        
-        .copy-btn {
-            background: var(--info);
-            color: white;
-            border: none;
-            padding: 0.2rem 0.6rem;
-            border-radius: 30px;
-            cursor: pointer;
-            font-size: 0.7rem;
+
+        .info-list {
+            display: grid;
+            gap: 14px;
         }
-        
+
+        .info-item {
+            padding-bottom: 12px;
+            border-bottom: 1px solid rgba(109, 91, 208, 0.1);
+        }
+
+        .info-item:last-child {
+            padding-bottom: 0;
+            border-bottom: none;
+        }
+
+        .info-label {
+            margin-bottom: 6px;
+            font-size: 0.68rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--muted);
+        }
+
+        .info-value {
+            font-size: 0.9rem;
+            color: var(--text);
+            word-break: break-word;
+        }
+
         .expand-btn {
-            background: none;
+            margin-top: 8px;
+            padding: 0;
             border: none;
-            color: var(--primary-dark);
+            background: transparent;
+            color: var(--primary-strong);
+            font-weight: 600;
             cursor: pointer;
-            font-size: 0.7rem;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.3rem;
-            margin-top: 0.3rem;
         }
-        
+
         .expandable {
-            max-height: 70px;
+            max-height: 60px;
             overflow: hidden;
             transition: max-height 0.2s ease;
         }
-        
+
         .expandable.expanded {
             max-height: none;
         }
-        
-        @media (max-width: 768px) {
-            .error-container {
-                flex-direction: column;
+
+        @media (max-width: 900px) {
+            .layout {
+                grid-template-columns: 1fr;
             }
-            .error-header {
+        }
+
+        @media (max-width: 640px) {
+            .error-shell {
+                padding: 24px 14px 36px;
+            }
+
+            .topbar {
                 flex-direction: column;
                 align-items: flex-start;
             }
-            .main-error {
-                width: 100% !important;
-                display: flex;
-                justify-content: space-between;
-                flex-direction: column;
-                gap: 3px;
-                top: calc(120px + 2rem);
-            }
-    
-            .sidebar {
-                width: 100%;
-            }
-            
-            .error-section {
-                width: 100%;
+
+            .panel-hero {
+                padding: 20px 18px 16px;
             }
         }
     </style>
 </head>
 <body>
-    <div class="error-wrapper">
-        <div class="error-header">
-            <div class="app-info">
-                <h1>{$appName} <span style="font-size:0.8rem;">v{$appVersion}</span></h1>
-                <div>
-                    <span class="environment"><b>App env: {$environment}</b></span>
-                    <span class="environment">Error #: {$errorCode}</span>
+    <div class="error-shell">
+        <main class="layout">
+            <section class="panel panel-hero">
+                <div class="hero-meta">
+                    <span class="status-badge">Exception</span>
+                    <span>{$context['timestamp']}</span>
                 </div>
-            </div>
-            <div class="error-badge">
-                {$errorClass}
-            </div>
-        </div>
-        
-        <div class="error-container">
-            <div class="main-error">
-                <div class="error-section">
-                    <h2 class="section-title">Oops! Something went wrong</h2>
-                    
-                    <div class="error-message">
-                        <h3>{$errorMessage}</h3>
-                        <p>Exception thrown in <code>{$errorClass}</code></p>
-                    </div>
-                    
-                    <div class="error-location">
-                        {$errorFile} <strong>on line {$errorLine}</strong>
-                    </div>
-                    
-                    {$codeSnippet}
-                    
+
+                <h2>{$errorMessage}</h2>
+                <p class="subheading">Raised by <code>{$errorClass}</code> while handling this request.</p>
+
+                <div class="location-bar">
+                    <span class="label">Location</span>
+                    <span>{$errorFile}</span>
+                    <strong>line {$errorLine}</strong>
+                </div>
+
+                {$codeSnippet}
+
 HTML;
 
         if ($showTrace && !empty($errorTrace)) {
             echo <<<HTML
-                    <div>
-                        <h2 class="section-title">Stack Trace</h2>
-                        <div class="tabs">
-                            <button class="tab-button active" onclick="switchTraceTab('trace-full')">Full Trace</button>
-                            <button class="tab-button" onclick="switchTraceTab('trace-simple')">Simple</button>
-                        </div>
-                        
-                        <div id="trace-full" class="tab-content active">
+                <div class="content-stack">
+                    <h3 class="section-title">Stack Trace</h3>
+                    <div class="tabs">
+                        <button class="tab-button trace-tab active" type="button" onclick="switchTraceTab('trace-full', this)">Full Trace</button>
+                        <button class="tab-button trace-tab" type="button" onclick="switchTraceTab('trace-simple', this)">Simple</button>
+                    </div>
+
+                    <div id="trace-full" class="tab-content active">
+                        <div class="trace-list">
 HTML;
-            
+
             foreach ($errorTrace as $index => $trace) {
                 $file = $trace['file'] ?? 'internal';
                 $line = $trace['line'] ?? 0;
@@ -922,170 +930,163 @@ HTML;
                 $type = $trace['type'] ?? '';
                 $function = $trace['function'] ?? '';
                 $args = isset($trace['args']) ? self::formatTraceArgs($trace['args']) : '';
-                
+
                 echo <<<HTML
                             <div class="trace-item">
-                                <div class="trace-location">
-                                    <strong>#{$index}</strong> {$class}{$type}{$function}({$args})
-                                </div>
-                                <div class="trace-file">
-                                    {$file}:{$line}
-                                </div>
+                                <div class="trace-location"><strong>#{$index}</strong> {$class}{$type}{$function}({$args})</div>
+                                <div class="trace-file">{$file}:{$line}</div>
                             </div>
 HTML;
             }
-            
+
             echo <<<HTML
                         </div>
-                        
-                        <div id="trace-simple" class="tab-content">
+                    </div>
+
+                    <div id="trace-simple" class="tab-content">
+                        <div class="trace-list">
 HTML;
-            
-            // Show simplified trace
+
             foreach ($errorTrace as $index => $trace) {
                 $file = $trace['file'] ?? 'internal';
                 $line = $trace['line'] ?? 0;
-                
-                if ($index < 10) { // Show only first 10
+
+                if ($index < 10) {
                     echo <<<HTML
                             <div class="trace-item">
-                                <div class="trace-location">
-                                    <strong>#{$index}</strong> {$file}
-                                </div>
+                                <div class="trace-location"><strong>#{$index}</strong> {$file}</div>
+                                <div class="trace-file">line {$line}</div>
                             </div>
 HTML;
                 }
             }
-            
+
             echo <<<HTML
                         </div>
                     </div>
+                </div>
 HTML;
         }
 
         if ($showEnvironment) {
             echo <<<HTML
-                    <div>
-                        <h2 class="section-title">Debug Info</h2>
-                        <div class="tabs">
-                            <button class="tab-button active" onclick="switchDebugTab('debug-request')">Request</button>
-                            <button class="tab-button" onclick="switchDebugTab('debug-session')">Session</button>
-                            <button class="tab-button" onclick="switchDebugTab('debug-environment')">Environment</button>
-                            <button class="tab-button" onclick="switchDebugTab('debug-routes')">Routes</button>
-                        </div>
-                        
-                        <div id="debug-request" class="tab-content active">
-                            <div class="preformatted">{$requestData}</div>
-                        </div>
-                        
-                        <div id="debug-session" class="tab-content">
-                            <div class="preformatted">{$sessionData}</div>
-                        </div>
-                        
-                        <div id="debug-environment" class="tab-content">
-                            <div class="preformatted">{$environmentData}</div>
-                        </div>
-                        
-                        <div id="debug-routes" class="tab-content">
-                            <div class="preformatted">{$routesData}</div>
-                        </div>
+                <div class="content-stack">
+                    <h3 class="section-title">Debug Information</h3>
+                    <div class="tabs">
+                        <button class="tab-button debug-tab active" type="button" onclick="switchDebugTab('debug-request', this)">Request</button>
+                        <button class="tab-button debug-tab" type="button" onclick="switchDebugTab('debug-session', this)">Session</button>
+                        <button class="tab-button debug-tab" type="button" onclick="switchDebugTab('debug-environment', this)">Environment</button>
+                        <button class="tab-button debug-tab" type="button" onclick="switchDebugTab('debug-routes', this)">Routes</button>
+                        <button class="tab-button debug-tab" type="button" onclick="switchDebugTab('debug-logs', this)">Logs</button>
                     </div>
+
+                    <div id="debug-request" class="tab-content active">
+                        <div class="preformatted">{$requestData}</div>
+                    </div>
+                    <div id="debug-session" class="tab-content">
+                        <div class="preformatted">{$sessionData}</div>
+                    </div>
+                    <div id="debug-environment" class="tab-content">
+                        <div class="preformatted">{$environmentData}</div>
+                    </div>
+                    <div id="debug-routes" class="tab-content">
+                        <div class="preformatted">{$routesData}</div>
+                    </div>
+                    <div id="debug-logs" class="tab-content">
+                        <div class="preformatted">{$logsData}</div>
+                    </div>
+                </div>
 HTML;
         }
 
         echo <<<HTML
-                
-            </div>
-            
-            <div class="sidebar">
+            </section>
+
+            <aside class="sidebar">
                 <div class="info-card">
                     <h3 class="section-title">Error Details</h3>
-                    <div class="info-item">
-                        <div class="info-label">Error Code</div>
-                        <div class="info-value">#{$errorCode}</div>
-                    </div>
-                    <div class="info-item">
-                        <div class="info-label">Exception Type</div>
-                        <div class="info-value">{$errorClass}</div>
-                    </div>
-                    <div class="info-item">
-                        <div class="info-label">Timestamp</div>
-                        <div class="info-value">{$context['timestamp']}</div>
-                    </div>
-                    <div class="info-item">
-                        <div class="info-label">Memory Usage</div>
-                        <div class="info-value">{$context['memory_usage']}</div>
-                    </div>
-                    <div class="info-item">
-                        <div class="info-label">Peak Memory</div>
-                        <div class="info-value">{$context['peak_memory']}</div>
-                    </div>
-                    <div class="info-item">
-                        <div class="info-label">PHP Version</div>
-                        <div class="info-value">PHP {$context['PHP_VERSION']}</div>
+                    <div class="info-list">
+                        <div class="info-item">
+                            <div class="info-label">Error Code</div>
+                            <div class="info-value">#{$errorCode}</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="info-label">Exception Type</div>
+                            <div class="info-value">{$errorClass}</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="info-label">Timestamp</div>
+                            <div class="info-value">{$context['timestamp']}</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="info-label">Memory Usage</div>
+                            <div class="info-value">{$context['memory_usage']}</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="info-label">Peak Memory</div>
+                            <div class="info-value">{$context['peak_memory']}</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="info-label">PHP Version</div>
+                            <div class="info-value">PHP {$context['PHP_VERSION']}</div>
+                        </div>
                     </div>
                 </div>
-                
+
                 <div class="info-card">
                     <h3 class="section-title">Request</h3>
-                    <div class="info-item">
-                        <div class="info-label">URL</div>
-                        <div class="info-value">{$_SERVER['REQUEST_URI']}</div>
-                    </div>
-                    <div class="info-item">
-                        <div class="info-label">Method</div>
-                        <div class="info-value">{$_SERVER['REQUEST_METHOD']}</div>
-                    </div>
-                    <div class="info-item">
-                        <div class="info-label">IP Address</div>
-                        <div class="info-value">{$_SERVER['REMOTE_ADDR']}</div>
-                    </div>
-                    <div class="info-item">
-                        <div class="info-label">User Agent</div>
-                        <div class="info-value expandable" id="user-agent">
-                            {$_SERVER['HTTP_USER_AGENT']}
+                    <div class="info-list">
+                        <div class="info-item">
+                            <div class="info-label">URL</div>
+                            <div class="info-value">{$_SERVER['REQUEST_URI']}</div>
                         </div>
-                        <button class="expand-btn" onclick="toggleExpand('user-agent')">
-                            <i class="fas fa-expand"></i> Expand
-                        </button>
+                        <div class="info-item">
+                            <div class="info-label">Method</div>
+                            <div class="info-value">{$_SERVER['REQUEST_METHOD']}</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="info-label">IP Address</div>
+                            <div class="info-value">{$_SERVER['REMOTE_ADDR']}</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="info-label">User Agent</div>
+                            <div class="info-value expandable" id="user-agent">{$_SERVER['HTTP_USER_AGENT']}</div>
+                            <button class="expand-btn" type="button" onclick="toggleExpand('user-agent', this)">Expand</button>
+                        </div>
                     </div>
                 </div>
-            </div>
-        </div>
+            </aside>
+        </main>
     </div>
 
     <script>
-        function switchTraceTab(tabId) {
-            document.querySelectorAll('#trace-full, #trace-simple').forEach(tab => {
-                tab.classList.remove('active');
-            });
-            document.querySelectorAll('.tab-button').forEach(btn => {
-                btn.classList.remove('active');
-            });
+        function switchTraceTab(tabId, button) {
+            document.querySelectorAll('.trace-tab').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('#trace-full, #trace-simple').forEach(tab => tab.classList.remove('active'));
             document.getElementById(tabId).classList.add('active');
-            event.target.classList.add('active');
+            button.classList.add('active');
         }
-        
-        function toggleExpand(elementId) {
+
+        function switchDebugTab(tabId, button) {
+            document.querySelectorAll('.debug-tab').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('#debug-request, #debug-session, #debug-environment, #debug-routes, #debug-logs').forEach(tab => tab.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+            button.classList.add('active');
+        }
+
+        function toggleExpand(elementId, button) {
             const element = document.getElementById(elementId);
-            const button = event.target;
+            if (!element || !button) return;
+
             if (element.classList.contains('expanded')) {
                 element.classList.remove('expanded');
-                button.innerHTML = '<i class="fas fa-expand"></i> Expand';
+                button.textContent = 'Expand';
             } else {
                 element.classList.add('expanded');
-                button.innerHTML = '<i class="fas fa-compress"></i> Collapse';
+                button.textContent = 'Collapse';
             }
         }
-        
-        function copyErrorDetails() {
-            const details = `Error: {$errorMessage}\\nFile: {$errorFile}\\nLine: {$errorLine}\\nCode: {$errorCode}\\nClass: {$errorClass}\\nTime: {$context['timestamp']}\\nURL: {$_SERVER['REQUEST_URI']}\\nIP: {$_SERVER['REMOTE_ADDR']}`;
-            navigator.clipboard.writeText(details).then(() => {
-                alert('Error details copied!');
-            });
-        }
-        
-        // Highlight error line in code
+
         document.querySelectorAll('.code-content div').forEach(line => {
             if (line.textContent.includes('{$errorLine}')) {
                 line.classList.add('line-error');
@@ -1101,8 +1102,9 @@ HTML;
     {
         if (isset(self::$genericRendered['error'])) return;
         self::$genericRendered['error'] = true;
-        
+
         $appName = getenv("APP_NAME") ?? "Machinjiri";
+        $environment = getenv("APP_ENV") ?? "production";
 
         echo <<<HTML
 <!DOCTYPE html>
@@ -1112,150 +1114,200 @@ HTML;
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>{$appName} - 500 Internal Server Error</title>
     <style>
-        *,
-        *::before,
-        *::after {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-
         :root {
-            --primary: #6D5BD0;
-            --dark: #5A48B8;
-            --light: #8877E8;
-            --soft: #DDD7F9;
-            --secondary: #F2EFFE;
-            --medium: #CBC2F0;
-            --subtle: #E9E6FA;
-            --deep: #4B3E9E;
-            --lilac: #B9AFF0;
-            --warm: #FFFAE6;
-            --text: #4b3e9e;
-            --bg: #dddddd;
-            --card-bg: #faf9ff;
-            --shadow: 0 2px 36px rgba(0, 0, 0, 0.08);
-            --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
-            --code-font: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
-            --transition: 0.2s ease-in-out;
+            --bg: #f4f3ff;
+            --panel: rgba(255, 255, 255, 0.85);
+            --panel-strong: #ffffff;
+            --primary: #6d5bd0;
+            --primary-strong: #4d3eb6;
+            --text: #1f2937;
+            --muted: #5f6676;
+            --border: rgba(109, 91, 208, 0.14);
+            --shadow: 0 22px 50px rgba(44, 34, 87, 0.14);
+            --radius: 22px;
+            --font: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         }
 
         @media (prefers-color-scheme: dark) {
             :root {
-                --primary: #8877E8;
-                --dark: #9D8FF0;
-                --light: #6D5BD0;
-                --soft: #4A3F7A;
-                --secondary: #2D2746;
-                --medium: #423B63;
-                --subtle: #5B4E9E;
-                --deep: #B9AFF0;
-                --lilac: #CFC6F0;
-                --warm: #F2E9FF;
-                --bg: #16141f !important;
-                --card-bg: #1e1b2b;
-                --text: #efedf7;
+                --bg: #120f1d !important;
+                --panel: rgba(22, 24, 37, 0.88);
+                --panel-strong: #181b2a;
+                --primary: #a78bfa;
+                --primary-strong: #8b5cf6;
+                --text: #edf2ff;
+                --muted: #a4acc5;
+                --border: rgba(173, 160, 255, 0.16);
+                --shadow: 0 22px 50px rgba(10, 8, 20, 0.55);
             }
+
+            body {
+                background:
+                    radial-gradient(circle at top left, rgba(167, 139, 250, 0.18), transparent 28%),
+                    linear-gradient(180deg, #120f1d 0%, #171824 100%);
+            }
+
+            .error-card,
+            .app-tag,
+            .btn-secondary {
+                border-color: var(--border);
+            }
+        }
+
+        * {
+            box-sizing: border-box;
         }
 
         body {
-            background: var(--bg);
+            margin: 0;
+            min-height: 100vh;
+            display: grid;
+            place-items: center;
+            background:
+                radial-gradient(circle at top left, rgba(109, 91, 208, 0.18), transparent 28%),
+                linear-gradient(180deg, #f6f5ff 0%, #eef1ff 100%);
+            font-family: var(--font);
+            color: var(--text);
+            padding: 24px;
+        }
+
+        .error-card {
+            width: min(100%, 560px);
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            backdrop-filter: blur(10px);
+            padding: 28px 28px 24px;
+        }
+
+        .error-top {
             display: flex;
             align-items: center;
-            justify-content: center;
-            font-family: var(--font-family);
-            color: var(--text);
-            padding: 1.5rem;
-            margin: 0;
-            transition: background var(--transition), color var(--transition);
-        }
-
-        .error-container {
-            background: var(--card-bg);
-            max-width: 600px;
-            width: 100%;
-            box-shadow: var(--shadow);
-            padding: 2.5rem 2.5rem 2rem;
-            transition: background var(--transition), box-shadow var(--transition);
-        }
-
-        .error-header {
-            display: flex;
-            align-items: baseline;
             justify-content: space-between;
-            flex-wrap: wrap;
-            gap: 0.75rem 1rem;
-            margin-bottom: 1.5rem;
+            gap: 12px;
+            margin-bottom: 14px;
         }
 
         .error-code {
-            font-size: 4rem;
-            font-weight: 700;
+            font-size: clamp(2.5rem, 7vw, 4.2rem);
             line-height: 1;
-            color: var(--dark);
-            letter-spacing: -0.04em;
-            font-family: var(--code-font);
+            font-weight: 800;
+            letter-spacing: -0.06em;
+            color: var(--primary);
         }
 
-        .app-name {
-            font-size: 0.875rem;
-            font-weight: 500;
-            color: var(--text-muted);
-            background: var(--bg);
-            padding: 0.4rem 1rem;
-            border-radius: 2rem;
-            border: 1px solid var(--deep);
-            white-space: nowrap;
+        .app-tag {
+            background: rgba(109, 91, 208, 0.08);
+            border: 1px solid rgba(109, 91, 208, 0.12);
+            color: var(--primary-strong);
+            border-radius: 999px;
+            padding: 7px 12px;
+            font-size: 0.78rem;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
         }
 
-        .error-message {
-            font-size: 1.5rem;
-            font-weight: 600;
-            margin: 0.25rem 0 0.75rem 0;
-            color: var(--text-primary);
+        h1 {
+            margin: 0 0 12px;
+            font-size: clamp(1.9rem, 4vw, 2.6rem);
+            line-height: 1.1;
+            color: var(--text);
         }
 
-        .error-description {
+        p {
+            margin: 0;
+            color: var(--muted);
+            line-height: 1.7;
             font-size: 1rem;
-            line-height: 1.6;
-            color: var(--text-muted);
-            margin: 0 0 2rem 0;
-            padding: 1rem 0 0 0;
-            border-top: 1px solid var(--border-color);
         }
 
-        /* ----- Responsive ----- */
-        @media (max-width: 480px) {
-            .error-container {
-                padding: 1.75rem 1.25rem 1.5rem;
-            }
-
-            .error-code {
-                font-size: 3rem;
-            }
-
-            .error-message {
-                font-size: 1.25rem;
-            }
+        .actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-top: 22px;
         }
 
-        @media (prefers-reduced-motion: reduce) {
-            *,
-            *::before,
-            *::after {
-                transition-duration: 0.01ms !important;
-                animation-duration: 0.01ms !important;
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 999px;
+            padding: 11px 18px;
+            font-weight: 700;
+            text-decoration: none;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .btn:hover {
+            transform: translateY(-1px);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary), var(--primary-strong));
+            color: #fff;
+            box-shadow: 0 12px 24px rgba(109, 91, 208, 0.2);
+        }
+
+        .btn-secondary {
+            color: var(--primary-strong);
+            background: rgba(109, 91, 208, 0.08);
+            border: 1px solid rgba(109, 91, 208, 0.12);
+        }
+
+        .meta {
+            display: flex;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 10px;
+            padding-top: 18px;
+            margin-top: 22px;
+            border-top: 1px solid var(--border);
+            font-size: 0.78rem;
+            color: var(--muted);
+        }
+
+        @media (max-width: 520px) {
+            .error-card {
+                padding: 22px 18px 18px;
+            }
+
+            .error-top {
+                align-items: flex-start;
+                flex-direction: column;
+            }
+
+            .actions {
+                flex-direction: column;
+            }
+
+            .btn {
+                width: 100%;
             }
         }
     </style>
 </head>
 <body>
-    <div class="error-container" role="alert" aria-live="assertive">
-        <div class="error-header">
+    <div class="error-card" role="alert" aria-live="assertive">
+        <div class="error-top">
             <span class="error-code">500</span>
+            <span class="app-tag">{$appName}</span>
         </div>
 
-        <h1 class="error-message">Internal Server error</h1>
+        <h1>Something went wrong</h1>
+        <p>We hit an unexpected error while processing your request. Please try again in a moment, or contact support if the issue persists.</p>
+
+        <div class="actions">
+            <a class="btn btn-primary" href="javascript:location.reload()">Reload page</a>
+            <a class="btn btn-secondary" href="/">Go home</a>
+        </div>
+
+        <div class="meta">
+            <span>Environment: {$environment}</span>
+            <span>Issue logged</span>
+        </div>
     </div>
 </body>
 </html>
