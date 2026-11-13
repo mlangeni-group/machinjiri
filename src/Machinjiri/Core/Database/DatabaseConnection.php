@@ -10,10 +10,10 @@ use Mlangeni\Machinjiri\Core\Artisans\Adapters\MongoDB\MongoAdapter;
 use Mlangeni\Machinjiri\Core\Exceptions\DatabaseException;
 use Mlangeni\Machinjiri\Core\Database\Grammars\{Grammar, MySqlGrammar, PostgresGrammar};
 use Mlangeni\Machinjiri\Core\Artisans\Events\Factory;
+use Mlangeni\Machinjiri\Core\Database\Config\DatabaseConfiguration;
 
 class DatabaseConnection
 {
-    private static ?array $config = null;
     private static ?string $path = null;
 
     /** @var array<string, PDO> Pool of idle connections (key = connection hash) */
@@ -46,13 +46,17 @@ class DatabaseConnection
     /** @var MongoDB\Client|null MongoDB singleton connection */
     private static ?Client $mongoConnection = null;
 
-    private function __construct() {}
+    /** @var DatabaseConfiguration */
+    private static DatabaseConfiguration $databaseCfg;
+
     private function __clone() {}
 
     public function __wakeup()
     {
         throw DatabaseException::ConnectionError("Cannot unserialize a singleton.");
     }
+
+    public function __construct(DatabaseConfiguration $dbCfg) { self::$databaseCfg = $dbCfg; }
 
     /**
      * Set database configuration
@@ -63,21 +67,20 @@ class DatabaseConnection
      *        enabled (bool), max_connections, min_connections, idle_timeout, wait_timeout, persistent
      *   - Other driver-specific options (host, port, database, username, etc.)
      */
-    public static function setConfig(array $config): void
+    public static function setConfig(DatabaseConfiguration $dbCfg): self
     {
-        self::$config = $config;
+        self::$databaseCfg = $dbCfg;
 
-        // Configure pooling if enabled
-        $poolCfg = $config['pool'] ?? [];
-        self::$poolingEnabled = $poolCfg['enabled'] ?? false;
-        self::$maxConnections = $poolCfg['max_connections'] ?? 10;
-        self::$minConnections = $poolCfg['min_connections'] ?? 2;
-        self::$idleTimeout = $poolCfg['idle_timeout'] ?? 60;
-        self::$waitTimeout = $poolCfg['wait_timeout'] ?? 5;
-        self::$usePersistent = $poolCfg['persistent'] ?? false;
+        self::$poolingEnabled = $dbCfg->getPoolCfg()['enabled'] ?? false;
+        self::$maxConnections = $dbCfg->getPoolCfg()['max_connections'] ?? 10;
+        self::$minConnections = $dbCfg->getPoolCfg()['min_connections'] ?? 2;
+        self::$idleTimeout = $dbCfg->getPoolCfg()['idle_timeout'] ?? 60;
+        self::$waitTimeout = $dbCfg->getPoolCfg()['wait_timeout'] ?? 5;
+        self::$usePersistent = $dbCfg->getPoolCfg()['persistent'] ?? false;
 
         // Register shutdown to release all borrowed connections
         register_shutdown_function([self::class, 'shutdown']);
+        return $this;
     }
 
     public static function setPath(string $path): void
@@ -262,7 +265,7 @@ class DatabaseConnection
 
     public static function getDriver(): string
     {
-        return self::$config['driver'] ?? '';
+        return self::$databaseCfg->getDriver();
     }
 
     public static function getGrammar(): Grammar
@@ -298,11 +301,7 @@ class DatabaseConnection
 
     private static function getDriverOrFail(): string
     {
-        if (self::$config === null) {
-            throw DatabaseException::ConnectionError("Database configuration not set. Call setConfig() first.");
-        }
-
-        $driver = self::$config['driver'] ?? null;
+        $driver = self::getDriver();
         if (!$driver) {
             throw DatabaseException::ConnectionError("Database configuration must specify a 'driver'.");
         }
@@ -370,15 +369,18 @@ class DatabaseConnection
     {
         if (self::$mongoConnection === null) {
             try {
+
+                $cfg = self::$databaseCfg->getConnCfg();
+
                 $mongoAdapter = new MongoAdapter([
-                    'host' => self::$config['host'] ?? 'localhost',
-                    'port' => self::$config['port'] ?? 27017,
-                    'username' => self::$config['username'] ?? null,
-                    'password' => self::$config['password'] ?? null,
-                    'database' => self::$config['database'] ?? null,
-                    'uri' => self::$config['uri'] ?? null,
-                    'options' => self::$config['options'] ?? [],
-                    'driverOptions' => self::$config['options'] ?? []
+                    'host' => $cfg['host'] ?? 'localhost',
+                    'port' => $cfg['port'] ?? 27017,
+                    'username' => $cfg['username'] ?? null,
+                    'password' => $cfg['password'] ?? null,
+                    'database' => $cfg['database'] ?? null,
+                    'uri' => $cfg['uri'] ?? null,
+                    'options' => $cfg['options'] ?? [],
+                    'driverOptions' => $cfg['options'] ?? []
                 ]);
                 self::$mongoConnection = $mongoAdapter->connect();
             } catch (DatabaseException $e) {
@@ -392,36 +394,27 @@ class DatabaseConnection
     private static function createPdoConnection(bool $persistent = false): PDO
     {
         $driver = self::getDriverOrFail();
+
+        $config = self::$databaseCfg->getConnCfg();
+
         if (!in_array($driver, ['mysql', 'pgsql', 'sqlite'])) {
             return self::createCustomPdoConnection($persistent);
         }
 
         if ($driver === 'sqlite') {
-            $database = self::$path;
-            if (!is_file(self::$path) && is_dir(self::$path)) {
-                $database = self::$path . '/database.sqlite';
-                if (!is_file($database)) @fopen($database, 'w');
-            }
-
-            $path = (is_file($database)) ? $database : database_path('/database.sqlite');
-            
-            $dsn = "sqlite:{$path}";
+            $database = self::$path ?? self::$databaseCfg->getConnCfg()['database'];
+            $dsn = "sqlite:{$database}";
             $username = null;
             $password = null;
         } else {
-            $required = ['host', 'database', 'username', 'password'];
-            foreach ($required as $key) {
-                if (!isset(self::$config[$key]) && $key !== 'password') {
-                    throw DatabaseException::ConnectionError("Missing required configuration: {$key}");
-                }
-            }
+            $config = self::$databaseCfg->getConnCfg();
 
-            $host = self::$config['host'];
-            $port = self::$config['port'] ?? ($driver === 'mysql' ? 3306 : 5432);
-            $dbname = self::$config['database'];
-            $username = self::$config['username'];
-            $password = self::$config['password'] ?? '';
-            $charset = self::$config['charset'] ?? 'utf8mb4';
+            $host = $config['host'];
+            $port = $config['port'] ?? ($driver === 'mysql' ? 3306 : 5432);
+            $dbname = $config['database'];
+            $username = $config['username'];
+            $password = $config['password'] ?? '';
+            $charset = $config['charset'] ?? 'utf8mb4';
 
             $dsn = "{$driver}:host={$host};port={$port};dbname={$dbname}";
             if ($driver === 'mysql') {
@@ -439,7 +432,7 @@ class DatabaseConnection
             $defaultOptions[PDO::ATTR_PERSISTENT] = true;
         }
 
-        $options = array_replace($defaultOptions, self::$config['options'] ?? []);
+        $options = array_replace($defaultOptions, $config['options'] ?? []);
 
         try {
             return new PDO($dsn, $username ?? null, $password ?? null, $options);
@@ -450,12 +443,14 @@ class DatabaseConnection
 
     private static function createCustomPdoConnection(bool $persistent = false): PDO
     {
-        if (empty(self::$config['dsn'])) {
+        $config = self::$databaseCfg->getConnCfg();
+
+        if (empty($config['dsn'])) {
             throw DatabaseException::ConnectionError("Custom PDO driver requires 'dsn' configuration.");
         }
 
-        $username = self::$config['username'] ?? null;
-        $password = self::$config['password'] ?? null;
+        $username = $config['username'] ?? null;
+        $password = $config['password'] ?? null;
 
         $defaultOptions = [
             PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
@@ -466,10 +461,10 @@ class DatabaseConnection
             $defaultOptions[PDO::ATTR_PERSISTENT] = true;
         }
 
-        $options = array_replace($defaultOptions, self::$config['options'] ?? []);
+        $options = array_replace($defaultOptions, $config['options'] ?? []);
 
         try {
-            return new PDO(self::$config['dsn'], $username, $password, $options);
+            return new PDO($config['dsn'], $username, $password, $options);
         } catch (PDOException $e) {
             throw DatabaseException::ConnectionError("PDO connection failed: " . $e->getMessage());
         }

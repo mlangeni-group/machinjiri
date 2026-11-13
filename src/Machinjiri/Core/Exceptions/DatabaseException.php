@@ -51,4 +51,9 @@ class DatabaseException extends MachinjiriException
         return self::database("Database Query: " . $message, $previous);
     }
 
+    public static function CfgError(string $message, ?\Throwable $previous = null): MachinjiriException 
+    {
+        return self::database("Database Config: " . $message, $previous);
+    }
+
 }
