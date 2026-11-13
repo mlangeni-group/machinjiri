@@ -33,6 +33,7 @@ use Mlangeni\Machinjiri\Core\Security\Encryption\Bangwe;
 use Mlangeni\Machinjiri\Core\Security\Hashing\Hasher;
 use Mlangeni\Machinjiri\Core\Security\Tokens\{CSRFToken, CookieOptions};
 use Mlangeni\Machinjiri\Core\Transport\Mail\MailManager;
+use Mlangeni\Machinjiri\Core\Transport\Mail\MailTemplateRenderer;
 use Mlangeni\Machinjiri\Core\Transport\SMS\SMSManager;
 
 class AppServiceProvider extends ServiceProvider
@@ -345,6 +346,10 @@ class AppServiceProvider extends ServiceProvider
 
     private function registerTransportServices()
     {
+        $this->singleton(MailTemplateRenderer::class, function($app) {
+            return new MailTemplateRenderer($app);
+        });
+        
         $this->singleton(MailManager::class, function ($app) {
             $log = "mailer-transport";
             return new MailManager(
@@ -354,7 +359,7 @@ class AppServiceProvider extends ServiceProvider
                 new EventListener(
                     new Logger('mailer-transport', Logger::DEBUG, true, '', 'system')
                 ),
-                null,
+                $app->resolve(MailTemplateRenderer::class),
                 $app->resolve('queue.dispatcher')
             );
         });

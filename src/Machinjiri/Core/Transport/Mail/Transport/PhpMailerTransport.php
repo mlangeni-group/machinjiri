@@ -3,12 +3,11 @@
 namespace Mlangeni\Machinjiri\Core\Transport\Mail\Transport;
 
 use PHPMailer\PHPMailer\PHPMailer;
-use PHPMailer\PHPMailer\SMTP;
 use PHPMailer\PHPMailer\Exception as PHPMailerException;
 use Mlangeni\Machinjiri\Core\Transport\Mail\MailerInterface;
 use Mlangeni\Machinjiri\Core\Transport\Mail\MailMessage;
 use Mlangeni\Machinjiri\Core\Transport\Mail\MailResponse;
-use Mlangeni\Machinjiri\Core\Exceptions\MachinjiriException;
+use Mlangeni\Machinjiri\Core\Exceptions\TransportExceptions\MailException;
 use Mlangeni\Machinjiri\Core\Artisans\Logging\Logger;
 
 class PhpMailerTransport implements MailerInterface
@@ -33,13 +32,7 @@ class PhpMailerTransport implements MailerInterface
         $required = ['host', 'username', 'password', 'port', 'encryption', 'from_email'];
         foreach ($required as $key) {
             if (empty($config[$key])) {
-                throw new MachinjiriException(
-                    "Missing PHPMailer config: {$key}",
-                    500,
-                    null,
-                    ['missing_key' => $key],
-                    'mail_config'
-                );
+                throw MailException::TransportException("Missing PHPMailer config: {$key}");
             }
         }
     }
@@ -145,13 +138,8 @@ class PhpMailerTransport implements MailerInterface
                 }
             }
         }
-        throw new MachinjiriException(
-            'PHPMailer Transport Error: ' . ($lastException?->getMessage() ?? 'Unknown error'),
-            500,
-            $lastException,
-            ['attempts' => $this->maxRetries],
-            'mail_transport'
-        );
+
+        throw MailException::TransportException('PHPMailer Transport Error: ' . ($lastException?->getMessage() ?? 'Unknown error'), $lastException);
     }
 
     private function resetMailer(): void

@@ -6,7 +6,7 @@ use Mlangeni\Machinjiri\Core\Container;
 use Mlangeni\Machinjiri\Core\Artisans\Events\EventListener;
 use Mlangeni\Machinjiri\Core\Artisans\Logging\Logger;
 use Mlangeni\Machinjiri\Core\Artisans\Logging\LoggerFactory;
-use Mlangeni\Machinjiri\Core\Exceptions\MachinjiriException;
+use Mlangeni\Machinjiri\Core\Exceptions\TransportExceptions\MailException;
 use Mlangeni\Machinjiri\Core\Artisans\Contracts\JobDispatcherInterface;
 use Mlangeni\Machinjiri\App\Jobs\SendMailJob;
 use Mlangeni\Machinjiri\Core\Artisans\Generators\QueueJobGenerator;
@@ -31,7 +31,7 @@ class MailManager
      * @param EventListener|null $eventListener
      * @param TemplateRendererInterface|null $renderer
      * @param JobDispatcherInterface|null $dispatcher
-     * @throws MachinjiriException
+     * @throws MailException
      */
     public function __construct(
         Container $app,
@@ -65,13 +65,7 @@ class MailManager
         
         $default = $this->config['default'] ?? 'phpmailer';
         if (!isset($this->transports[$default])) {
-            throw new MachinjiriException(
-                "Default mail transport '{$default}' not registered",
-                500,
-                null,
-                ['default' => $default],
-                'mail_config'
-            );
+            throw MailException::ManagerException("Default mail transport '{$default}' not registered");
         }
         $this->defaultTransport = $this->transports[$default];
     }
@@ -80,32 +74,20 @@ class MailManager
      * Load mail configuration from Container's config directory.
      *
      * @return array
-     * @throws MachinjiriException if config file not found or invalid.
+     * @throws MailException if config file not found or invalid.
      */
     private function loadConfigFromContainer(): array
     {
         $configPath = $this->app->coreConfig . 'mail.php';
         
         if (!file_exists($configPath)) {
-            throw new MachinjiriException(
-                "Mail configuration file not found at: {$configPath}",
-                500,
-                null,
-                ['path' => $configPath],
-                'mail_config'
-            );
+            throw MailException::ManagerException("Mail configuration file not found at: {$configPath}");
         }
         
         $config = include $configPath;
         
         if (!is_array($config)) {
-            throw new MachinjiriException(
-                'Mail configuration file must return an array.',
-                500,
-                null,
-                ['path' => $configPath],
-                'mail_config'
-            );
+            throw MailException::ManagerException('Mail configuration file must return an array.');
         }
         
         return $config;
@@ -116,7 +98,7 @@ class MailManager
      *
      * @param string $name
      * @param array $config
-     * @throws MachinjiriException
+     * @throws MailException
      */
     private function registerTransport(string $name, array $config): void
     {
@@ -128,13 +110,7 @@ class MailManager
                 $transport = new Transport\PhpMailerTransport($config, $this->logger);
                 break;
             default:
-                throw new MachinjiriException(
-                    "Unknown transport type: {$type}",
-                    500,
-                    null,
-                    ['type' => $type],
-                    'mail_config'
-                );
+                throw MailException::ManagerException("Unknown transport type: {$type}");
         }
         $this->transports[$name] = $transport;
     }
@@ -146,13 +122,7 @@ class MailManager
     {
         $transport = $transportName ? ($this->transports[$transportName] ?? null) : $this->defaultTransport;
         if (!$transport) {
-            throw new MachinjiriException(
-                "Transport '{$transportName}' not found",
-                500,
-                null,
-                ['transport' => $transportName],
-                'mail_config'
-            );
+            throw MailException::ManagerException("Transport '{$transportName}' not found");
         }
 
         // Dispatch mail.sending event
@@ -188,7 +158,7 @@ class MailManager
             }
 
             return $response;
-        } catch (MachinjiriException $e) {
+        } catch (MailException $e) {
             $this->logger->error('Mail send failed', [
                 'error' => $e->getMessage(),
                 'subject' => $message->getSubject(),
@@ -215,13 +185,7 @@ class MailManager
     public function sendTemplate(string $templateName, array $data, callable $callback, ?string $transportName = null): MailResponse
     {
         if (!$this->renderer) {
-            throw new MachinjiriException(
-                'Template renderer not set. Configure a renderer before using sendTemplate().',
-                500,
-                null,
-                [],
-                'mail_config'
-            );
+            throw MailException::ManagerException('Template renderer not set. Configure a renderer before using sendTemplate().');
         }
         $html = $this->renderer->render($templateName . '.html.php', $data);
         $text = $this->renderer->render($templateName . '.text.php', $data);
@@ -236,7 +200,7 @@ class MailManager
     /**
      * Ensure the SendMailJob class exists; if not, generate it.
      *
-     * @throws MachinjiriException
+     * @throws MailException
      */
     private function ensureSendMailJobExists(): void
     {
@@ -246,10 +210,6 @@ class MailManager
 
         $this->logger->warning('SendMailJob not found, attempting to generate it...');
 
-        // Determine application base path from container
-        // The container may have a basePath property or method; adjust as needed.
-        // In many frameworks, the container holds the base path. Here we assume a method getBasePath().
-        // If not available, we fall back to a reasonable default based on the current script location.
         $basePath = null;
         if (method_exists($this->app, 'getBasePath')) {
             $basePath = $this->app->getBasePath();
@@ -261,13 +221,7 @@ class MailManager
         }
 
         if (!is_dir($basePath)) {
-            throw new MachinjiriException(
-                'Unable to determine application base path for generating SendMailJob.',
-                500,
-                null,
-                ['basePath' => $basePath],
-                'mail_config'
-            );
+            throw MailException::ManagerException('Unable to determine application base path for generating SendMailJob.');
         }
 
         try {
@@ -279,25 +233,13 @@ class MailManager
                 'timeout' => 60,
                 'delay' => 0,
             ]);
-        } catch (\Exception $e) {
-            throw new MachinjiriException(
-                'Failed to generate SendMailJob: ' . $e->getMessage(),
-                500,
-                $e,
-                [],
-                'mail_config'
-            );
+        } catch (\Throwable $e) {
+            throw MailException::ManagerException('Failed to generate SendMailJob: ' . $e->getMessage());
         }
 
         // Verify class now exists
         if (!class_exists(SendMailJob::class)) {
-            throw new MachinjiriException(
-                'SendMailJob was generated but class still not found. Check autoloading.',
-                500,
-                null,
-                [],
-                'mail_config'
-            );
+            throw MailException::ManagerException('SendMailJob was generated but class still not found. Check autoloading.');
         }
 
         $this->logger->info('SendMailJob generated successfully.');
@@ -306,18 +248,12 @@ class MailManager
     /**
      * Queue an email for asynchronous sending.
      *
-     * @throws MachinjiriException if job dispatcher not configured or job generation fails.
+     * @throws MailException if job dispatcher not configured or job generation fails.
      */
     public function queue(MailMessage $message, ?string $transportName = null, array $jobOptions = []): string
     {
         if (!$this->dispatcher) {
-            throw new MachinjiriException(
-                'Job dispatcher not configured. Bind a JobDispatcherInterface implementation.',
-                500,
-                null,
-                [],
-                'mail_config'
-            );
+            throw MailException::ManagerException('Job dispatcher not configured. Bind a JobDispatcherInterface implementation.');
         }
     
         // Ensure the job class exists (generate if missing)
@@ -355,13 +291,7 @@ class MailManager
     public function getTransport(string $name): MailerInterface
     {
         if (!isset($this->transports[$name])) {
-            throw new MachinjiriException(
-                "Transport '{$name}' not found",
-                500,
-                null,
-                ['transport' => $name],
-                'mail_config'
-            );
+            throw MailException::ManagerException("Transport '{$name}' not found");
         }
         return $this->transports[$name];
     }
