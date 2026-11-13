@@ -5,6 +5,7 @@ namespace Mlangeni\Machinjiri\Core\Database\Builders;
 use Mlangeni\Machinjiri\Core\Database\DatabaseConnection;
 use Mlangeni\Machinjiri\Core\Database\Grammars\Grammar;
 use Mlangeni\Machinjiri\Core\Database\Schema\Blueprint;
+use Mlangeni\Machinjiri\Core\Exceptions\DatabaseException;
 
 class QueryBuilder {
     protected string $table;
@@ -232,7 +233,7 @@ class QueryBuilder {
             'create' => $this->compileCreateTable(),
             'alter' => $this->compileAlterTable(),
             'drop' => $this->compileDropTable(),
-            default => throw new Exception('Invalid query action'),
+            default => throw DatabaseException::QueryBuilderError('Invalid query action'),
         };
     }
 

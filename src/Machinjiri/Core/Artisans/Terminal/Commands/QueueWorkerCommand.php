@@ -7,7 +7,6 @@ use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Input\{InputOption, InputArgument, InputInterface};
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\Console\Helper\{Table, ProgressBar};
-use Mlangeni\Machinjiri\Core\Exceptions\MachinjiriException;
 use Mlangeni\Machinjiri\Core\Artisans\Contracts\{BaseWorker, BackgroundWorkerManager};
 use Mlangeni\Machinjiri\Core\Artisans\Contracts\Schema\DatabaseQueueSchema;
 use Mlangeni\Machinjiri\Core\Artisans\Generators\QueueJobGenerator;
@@ -15,6 +14,7 @@ use Mlangeni\Machinjiri\Core\Artisans\Logging\{Logger, LoggerFactory};
 use Mlangeni\Machinjiri\Core\Database\DatabaseConnection;
 use Mlangeni\Machinjiri\Core\Artisans\Helpers\DotEnv;
 use Mlangeni\Machinjiri\Core\Container;
+use Mlangeni\Machinjiri\Core\Database\Config\DatabaseConfiguration;
 use Mlangeni\Machinjiri\Core\Exceptions\ContractsException\TerminalException;
 
 class SignalManager
@@ -137,56 +137,15 @@ trait QueueCommandHelper
         }
     }
 
+    private function getDbCfg(): DatabaseConfiguration
+    {
+        return new DatabaseConfiguration($this->artisanContainer());
+    }
+
     
     private function loadDatabaseConfig(): array
     {
-        $config = $this->artisanContainer()->configurations['database'] ?? null;
-        if ($config !== null && isset($config['driver'])) return $config;
-
-        $driver = getenv('DB_CONNECTION') ?: 'mysql';
-        $config = ['driver' => $driver];
-
-        switch ($driver) {
-            case 'mysql':
-            case 'pgsql':
-                $host = getenv('DB_HOST') ?: '127.0.0.1';
-                if ($host === 'localhost') {
-                    $host = '127.0.0.1';
-                }
-                $config['host'] = $host;
-                $config['port'] = getenv('DB_PORT') ?: ($driver === 'mysql' ? 3306 : 5432);
-                $config['database'] = getenv('DB_DATABASE') ?: '';
-                $config['username'] = getenv('DB_USERNAME') ?: '';
-                $config['password'] = getenv('DB_PASSWORD') ?: '';
-                $config['charset'] = getenv('DB_CHARSET') ?: 'utf8mb4';
-                break;
-            case 'sqlite':
-                $config['path'] = getcwd() . '/database/databasered.sqlite';
-                break;
-            case 'mongodb':
-                $config['host'] = getenv('DB_HOST') ?: 'localhost';
-                $config['port'] = getenv('DB_PORT') ?: 27017;
-                $config['database'] = getenv('DB_DATABASE') ?: '';
-                $config['username'] = getenv('DB_USERNAME') ?: '';
-                $config['password'] = getenv('DB_PASSWORD') ?: '';
-                break;
-            default:
-                $config['dsn'] = getenv('DB_DSN') ?: '';
-                $config['username'] = getenv('DB_USERNAME') ?: '';
-                $config['password'] = getenv('DB_PASSWORD') ?: '';
-        }
-
-        return $config;
-    }
-
-    private function bootstrapDatabaseConnection(): void
-    {
-        $dbConfig = $this->loadDatabaseConfig();
-        DatabaseConnection::setConfig($dbConfig);
-
-        if (($dbConfig['driver'] ?? '') === 'sqlite' && isset($dbConfig['path'])) {
-            DatabaseConnection::setPath(dirname($dbConfig['path']));
-        }
+        return $this->getDbCfg()->getConnCfg();
     }
     
     private function ensureDatabaseQueueTables(): void
@@ -290,7 +249,7 @@ trait QueueCommandHelper
     private function createFullSchema(): void
     {
         $logger = LoggerFactory::system('queue-setup', 'queue');
-        $driverName = $this->loadDatabaseConfig()['default'] ?? "mysql";
+        $driverName = $this->loadDatabaseConfig()['driver'] ?? "mysql";
         if (strtolower($driverName) == "mongodb") {
             $logger->info('MongoDB detected – no relational tables to create.');
             return;
@@ -1290,115 +1249,11 @@ class QueueWorkerCommand
                 protected function execute(InputInterface $input, OutputInterface $output): int
                 {
                     return $this->executeWithStyle($input, $output, 'Database Driver Info', function (SymfonyStyle $ss) {
-                        $this->bootstrapDependencies();
-                        try {
-                            $config = \Mlangeni\Machinjiri\Core\Database\DatabaseConnection::getConfig();
-                            if (!$config) {
-                                $config = $this->loadDatabaseConfig();
-                            }
-                        } catch (\Throwable $e) {
-                            // Fallback: load from environment
-                            $config = $this->loadDatabaseConfig();
-                        }
-            
+                        $connectionCfg = $this->getDbCfg();
+                        
                         $ss->section('Database Configuration');
-            
-                        $driver = $config['driver'] ?? 'unknown';
-                        $ss->writeln("Driver:      <info>{$driver}</info>");
-            
-                        switch ($driver) {
-                            case 'mysql':
-                            case 'pgsql':
-                                $host = $config['host'] ?? 'not set';
-                                $port = $config['port'] ?? ($driver === 'mysql' ? 3306 : 5432);
-                                $dbname = $config['database'] ?? 'not set';
-                                $username = $config['username'] ?? 'not set';
-                                $charset = $config['charset'] ?? 'utf8mb4';
-                                $socket = $config['unix_socket'] ?? 'not used';
-            
-                                $ss->writeln("Host:        <info>{$host}</info>");
-                                $ss->writeln("Port:        <info>{$port}</info>");
-                                $ss->writeln("Database:    <info>{$dbname}</info>");
-                                $ss->writeln("Username:    <info>{$username}</info>");
-                                $ss->writeln("Charset:     <info>{$charset}</info>");
-                                $ss->writeln("Unix Socket: <info>{$socket}</info>");
-                                break;
-            
-                            case 'sqlite':
-                                $path = $config['path'] ?? $config['database'] ?? 'not set';
-                                $ss->writeln("Database file: <info>{$path}</info>");
-                                break;
-            
-                            case 'mongodb':
-                                $host = $config['host'] ?? 'localhost';
-                                $port = $config['port'] ?? 27017;
-                                $dbname = $config['database'] ?? 'not set';
-                                $username = $config['username'] ?? 'not set';
-                                $ss->writeln("Host:        <info>{$host}</info>");
-                                $ss->writeln("Port:        <info>{$port}</info>");
-                                $ss->writeln("Database:    <info>{$dbname}</info>");
-                                $ss->writeln("Username:    <info>{$username}</info>");
-                                break;
-            
-                            default:
-                                $ss->writeln("DSN:         <info>" . ($config['dsn'] ?? 'not set') . "</info>");
-                                $ss->writeln("Username:    <info>" . ($config['username'] ?? 'not set') . "</info>");
-                        }
-            
-                        $ss->newLine();
-                        $ss->section('Connection Test');
-            
-                        try {
-                            $conn = \Mlangeni\Machinjiri\Core\Database\DatabaseConnection::getInstance();
-            
-                            if ($conn instanceof \PDO) {
-                                $stmt = $conn->query('SELECT 1 as test');
-                                $result = $stmt->fetch();
-                                if ($result && $result['test'] == 1) {
-                                    $ss->success("Database connection successful!");
-            
-                                    try {
-                                        $versionStmt = $conn->query('SELECT VERSION() as version');
-                                        $version = $versionStmt->fetch();
-                                        if ($version) {
-                                            $ss->writeln("MySQL Version: <info>" . $version['version'] . "</info>");
-                                        }
-                                    } catch (\Throwable $e) {
-                                        // ignore
-                                    }
-                                } else {
-                                    $ss->error("Query failed: unexpected result");
-                                    return Command::FAILURE;
-                                }
-                            } elseif ($conn instanceof \MongoDB\Client) {
-                                $ss->success("MongoDB connection successful!");
-                                $ss->writeln("MongoDB version: <info>" . $conn->getManager()->getServer()->getVersion() . "</info>");
-                            } else {
-                                $ss->warning("Connection object is of unknown type: " . get_class($conn));
-                            }
-                        } catch (\Throwable $e) {
-                            $ss->error("Connection failed: " . $e->getMessage());
-            
-                            $message = $e->getMessage();
-                            if (str_contains($message, 'No such file or directory')) {
-                                $ss->writeln("");
-                                $ss->writeln("<comment>Possible causes:</comment>");
-                                $ss->writeln("  • Using 'localhost' as host forces a Unix socket connection, but the socket file is missing.");
-                                $ss->writeln("  • Solution: change DB_HOST in .env to '127.0.0.1' to force TCP/IP connection.");
-                                $ss->writeln("  • Or provide the correct MySQL socket path in configuration (unix_socket).");
-                            } elseif (str_contains($message, 'Access denied')) {
-                                $ss->writeln("");
-                                $ss->writeln("<comment>Possible causes:</comment>");
-                                $ss->writeln("  • Incorrect username or password.");
-                                $ss->writeln("  • Check DB_USERNAME and DB_PASSWORD in .env file.");
-                            } elseif (str_contains($message, 'Unknown database')) {
-                                $ss->writeln("");
-                                $ss->writeln("<comment>Possible causes:</comment>");
-                                $ss->writeln("  • Database name does not exist.");
-                                $ss->writeln("  • Check DB_DATABASE in .env file.");
-                            }
-            
-                            return Command::FAILURE;
+                        foreach($connectionCfg->getConnCfg() as $k => $v) {
+                            $ss->writeln($k . " - " . $v);
                         }
             
                         return Command::SUCCESS;

@@ -897,7 +897,7 @@ class ErrorRenderer
                     <span>{$context['timestamp']}</span>
                 </div>
 
-                <h2>{$errorMessage}</h2>
+                <h3>{$errorMessage}</h3>
                 <p class="subheading">Raised by <code>{$errorClass}</code> while handling this request.</p>
 
                 <div class="location-bar">

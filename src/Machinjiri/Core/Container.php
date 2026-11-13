@@ -7,6 +7,7 @@ namespace Mlangeni\Machinjiri\Core;
 use Closure;
 use Mlangeni\Machinjiri\Core\Artisans\Events\EventListener;
 use Mlangeni\Machinjiri\Core\Artisans\Logging\{Logger, LoggerFactory};
+use Mlangeni\Machinjiri\Core\Database\Config\DatabaseConfiguration;
 use Mlangeni\Machinjiri\Core\Database\DatabaseConnection;
 use Mlangeni\Machinjiri\Core\Exceptions\BindingResolutionException;
 use Mlangeni\Machinjiri\Core\Exceptions\MachinjiriException;
@@ -959,32 +960,10 @@ class Container
 
     protected function dbConnect(): void
     {
-        $dbLogger = self::systemLogger('database');
-
-        try {
-            DatabaseConnection::setPath($this->database);
-
-            $dbConfig = $this->getConfigurations()['database'] ?? [];
-
-            if (empty($dbConfig)) {
-                throw new MachinjiriException('Database configuration not found', 113);
-            }
-
-            DatabaseConnection::setConfig($dbConfig);
-        } catch (MachinjiriException $e) {
-            $dbLogger->critical(
-                "Connection failed \ndriver => {driver}\nerror => {message}",
-                [
-                    'driver'  => DatabaseConnection::getDriver(),
-                    'message' => $e->getMessage(),
-                ]
-            );
-
-            $e->show();
-        }
+        
     }
 
-    protected static function systemLogger(string $logFile, bool $event = false): Logger
+    public static function systemLogger(string $logFile, bool $event = false): Logger
     {
         return LoggerFactory::system($logFile, 'framework', $event);
     }

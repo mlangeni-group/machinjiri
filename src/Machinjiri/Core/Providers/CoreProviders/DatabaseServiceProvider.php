@@ -13,6 +13,7 @@ use Mlangeni\Machinjiri\Core\Exceptions\MachinjiriException;
 use Mlangeni\Machinjiri\Core\Artisans\Logging\Logger;
 use Mlangeni\Machinjiri\Core\Database\Caching\PrefetchManager;
 use Mlangeni\Machinjiri\Core\Artisans\Caching\CacheManager;
+use Mlangeni\Machinjiri\Core\Database\Config\DatabaseConfiguration;
 
 class DatabaseServiceProvider extends ServiceProvider
 {
@@ -21,10 +22,12 @@ class DatabaseServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        $this->singleton(DatabaseConfiguration::class, function ($app) {
+            return new DatabaseConfiguration($app);
+        });
+
         $this->singleton('db.kernel.connection', function($app) {
-          $config = $app->getConfigurations()['database'];
-          DatabaseConnection::setConfig($config);
-          DatabaseConnection::setPath($app->database);
+          (new DatabaseConnection($app->resolve(DatabaseConfiguration::class)));
           return DatabaseConnection::getInstance();
         });
         
@@ -55,6 +58,8 @@ class DatabaseServiceProvider extends ServiceProvider
     public function boot(): void
     {
       try {
+        $this->dbConnect();
+
         $this->prefetchDatabase();
       } catch (MachinjiriException $machinjiriException) {
         $machinjiriException->show();
@@ -113,5 +118,24 @@ class DatabaseServiceProvider extends ServiceProvider
             array_keys($this->singletons),
             array_keys($this->aliases)
         );
+    }
+
+    private function dbConnect(): void 
+    {
+        $dbLogger = $this->app::systemLogger('database');
+        
+        $dbCfg = new DatabaseConfiguration($this->app);
+        try {
+            (new DatabaseConnection($dbCfg));
+
+        } catch (MachinjiriException $e) {
+            $dbLogger->critical("Connection failed \ndriver => {driver}\nerror => {message}",
+                [
+                    'driver'  => $dbCfg->getDriver(),
+                    'message' => $e->getMessage(),
+                ]
+            );
+            $e->show();
+        }
     }
 }

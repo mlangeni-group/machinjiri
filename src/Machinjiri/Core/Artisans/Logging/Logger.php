@@ -40,7 +40,7 @@ class Logger
         $this->referrer = $referrer ?? 'app';
         $this->subdirectory = $subdirectory;
         
-        $this->path = self::resolveLogPath($isEvent);
+        $this->path = realpath(self::resolveLogPath($isEvent));
 
         $this->logFile = self::createLogFile($this->path, $logFile);
 
