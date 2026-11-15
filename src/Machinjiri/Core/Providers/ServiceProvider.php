@@ -6,7 +6,7 @@ namespace Mlangeni\Machinjiri\Core\Providers;
 
 use Closure;
 use Mlangeni\Machinjiri\Core\Container;
-use Mlangeni\Machinjiri\Core\Exceptions\MachinjiriException;
+use Mlangeni\Machinjiri\Core\Exceptions\ServiceProviderException;
 use Mlangeni\Machinjiri\Core\Artisans\Events\EventListener;
 use Mlangeni\Machinjiri\Core\Artisans\Logging\LoggerFactory;
 
@@ -223,7 +223,7 @@ abstract class ServiceProvider
     protected function loadRoutesFrom(string $path): void
     {
         if (!is_file($path)) {
-            throw new MachinjiriException("Routes file not found: {$path}", 30107);
+            throw new ServiceProviderException("Routes file not found: {$path}", 30107);
         }
         require $path;
     }
