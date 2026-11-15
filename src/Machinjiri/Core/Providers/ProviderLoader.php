@@ -4,10 +4,12 @@ declare(strict_types=1);
 namespace Mlangeni\Machinjiri\Core\Providers;
 
 use Mlangeni\Machinjiri\Core\Container;
-use Mlangeni\Machinjiri\Core\Exceptions\MachinjiriException;
+use Mlangeni\Machinjiri\Core\Exceptions\ServiceProviderException;
 use Mlangeni\Machinjiri\Core\Providers\Contracts\DeferredProviderInterface;
 use Mlangeni\Machinjiri\Core\Providers\ServiceProvider;
 use Throwable;
+use Mlangeni\Machinjiri\Core\Artisans\Logging\Logger;
+use Mlangeni\Machinjiri\Core\Artisans\Logging\LoggerFactory;
 
 /**
  * Loads, registers and boots service providers.
@@ -34,6 +36,9 @@ final class ProviderLoader
     /** @var array<string, class-string<ServiceProvider>> */
     protected array $deferred = [];
 
+    /** @var Logger $logger */
+    private Logger $logger;
+
     public function __construct(Container $app)
     {
         $this->app = $app;
@@ -41,6 +46,8 @@ final class ProviderLoader
         Container::setInstance($app); // for ServiceProvider constructor
 
         $this->app->setProviderLoader($this);
+
+        $this->logger = LoggerFactory::system('service', 'service-container');
     }
 
     // ---------------------------------------------------------------------
@@ -62,18 +69,25 @@ final class ProviderLoader
 
     public function boot(): void
     {
-        // Sort by declared priority (stable for equal priorities).
-        $eager = array_filter(
-            $this->providers,
-            static fn (ServiceProvider $p): bool => !$p->isDeferred()
-        );
+        try {
+            // Sort by declared priority (stable for equal priorities).
+            $eager = array_filter(
+                $this->providers,
+                static fn (ServiceProvider $p): bool => !$p->isDeferred()
+            );
 
-        uasort($eager, static fn (ServiceProvider $a, ServiceProvider $b): int
-            => $a->bootPriority() <=> $b->bootPriority());
+            uasort($eager, static fn (ServiceProvider $a, ServiceProvider $b): int
+                => $a->bootPriority() <=> $b->bootPriority());
 
-        foreach ($eager as $provider) {
-            $this->bootProvider($provider);
+            foreach ($eager as $provider) {
+                $this->bootProvider($provider);
+            }
+        } catch (ServiceProviderException $e) {
+            $this->logger->error($e->getMessage());
+            // render the exception
+            $e->show();
         }
+        
     }
 
     // ---------------------------------------------------------------------
@@ -89,12 +103,12 @@ final class ProviderLoader
             return $this->providers[$providerClass];
         }
         if (!class_exists($providerClass)) {
-            throw new MachinjiriException(
+            throw new ServiceProviderException(
                 "Service provider not found: {$providerClass}", 30110
             );
         }
         if (!is_subclass_of($providerClass, ServiceProvider::class)) {
-            throw new MachinjiriException(
+            throw new ServiceProviderException(
                 "{$providerClass} must extend " . ServiceProvider::class, 30113
             );
         }
@@ -103,7 +117,7 @@ final class ProviderLoader
             /** @var ServiceProvider $provider */
             $provider = new $providerClass($this->app);
         } catch (Throwable $e) {
-            throw new MachinjiriException(
+            throw new ServiceProviderException(
                 "Failed to instantiate provider {$providerClass}: {$e->getMessage()}",
                 30111, $e
             );
@@ -213,7 +227,7 @@ final class ProviderLoader
             $provider->{$method}();
             $this->registered[$class] = true;
         } catch (Throwable $e) {
-            throw new MachinjiriException(
+            throw new ServiceProviderException(
                 "Error in {$class}::{$method}(): {$e->getMessage()}",
                 30112, $e
             );
@@ -264,7 +278,7 @@ final class ProviderLoader
         if (is_file($userConfigPath)) {
             $user = require $userConfigPath;
             if (!is_array($user)) {
-                throw new MachinjiriException(
+                throw new ServiceProviderException(
                     "providers.php must return an array.", 30106
                 );
             }

@@ -109,6 +109,21 @@ class MailManager
             case 'phpmailer':
                 $transport = new Transport\PhpMailerTransport($config, $this->logger);
                 break;
+            case 'sendgrid':
+                $transport = new Transport\SendGridTransport($config, $this->logger, $config['client'] ?? null);
+                break;
+            case 'aws':
+            case 'aws-ses':
+            case 'ses':
+                $transport = new Transport\AwsSesTransport($config, $this->logger, $config['client'] ?? null);
+                break;
+            case 'symfony':
+            case 'symfony-mailer':
+                $transport = new Transport\SymfonyMailerTransport($config, $this->logger, $config['mailer'] ?? null);
+                break;
+            case 'mailgun':
+                $transport = new Transport\MailgunTransport($config, $this->logger, $config['client'] ?? null);
+                break;
             default:
                 throw MailException::ManagerException("Unknown transport type: {$type}");
         }
@@ -187,8 +202,8 @@ class MailManager
         if (!$this->renderer) {
             throw MailException::ManagerException('Template renderer not set. Configure a renderer before using sendTemplate().');
         }
-        $html = $this->renderer->render($templateName . '.html.php', $data);
-        $text = $this->renderer->render($templateName . '.text.php', $data);
+        $html = $this->renderer->render($templateName, $data, 'html');
+        $text = $this->renderer->render($templateName, $data, 'text');
 
         $message = new MailMessage();
         $message->html($html, $text);

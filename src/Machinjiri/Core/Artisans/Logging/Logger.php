@@ -84,7 +84,7 @@ class Logger
     protected function createLogFile(string $path, ?string $logFile = null): string
     {
         $this->logFilename = str_replace(['-', '/', '*', ':'], '.', strtolower($logFile ?? "log"));
-        return $path . $this->referrer . '.' . $this->logFilename . '.log';
+        return $path . DIRECTORY_SEPARATOR . $this->referrer . '.' . $this->logFilename . '.log';
     }
 
     protected function resolveLogPath(?bool $isEvent = false): string

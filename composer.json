@@ -33,7 +33,11 @@
   },
   "suggest": {
     "predis/predis" : "^3.3.0",
-    "dragonmantank/cron-expression": "^3.6.0"
+    "dragonmantank/cron-expression": "^3.6.0",
+    "aws/aws-sdk-php": "Required for the AWS SES mail transport",
+    "mailgun/mailgun-php": "Required for the Mailgun mail transport",
+    "sendgrid/sendgrid": "Required for the SendGrid mail transport",
+    "symfony/mailer": "Required for the Symfony Mailer transport"
   },
   "autoload": {
     "psr-4": {
