@@ -26,7 +26,7 @@ class DatabaseConfiguration
     private bool $useMultiple = false;
 
     /** @var array $supportedDrivers */
-    private array $supportedDrivers = ['mysql', 'sqlite', 'psgl', 'custome'];
+    private array $supportedDrivers = ['mysql', 'pgsql', 'sqlite', 'mongodb', 'custom'];
 
     public function __construct(private Container $container)
     {
