@@ -42,7 +42,7 @@ class ViewCommands
                           $generator = new TemplateGenerator(resource_path("views"));
                           $path = $generator->makeView($name, $layout, [], $force);
                           $ss->success("View '{$name}' created successfully");
-                          $ss->text("Path: " . $path);
+                          $ss->definitionList(['Path' => $path]);
                           return Command::SUCCESS;
                       } catch (\Throwable $e) {
                           $ss->error($e->getMessage());
@@ -76,7 +76,7 @@ class ViewCommands
                           $generator = new TemplateGenerator(getcwd() . "/resources/views/layouts/");
                           $path = $generator->makeLayout($name, [], $force);
                           $ss->success("Layout '{$name}' created successfully");
-                          $ss->text("Path: " . $path);
+                          $ss->definitionList(['Path' => $path]);
                           return Command::SUCCESS;
                       } catch (MachinjiriException $e) {
                           $ss->error($e->getMessage());
@@ -109,7 +109,7 @@ class ViewCommands
                           $generator = new TemplateGenerator(getcwd() . "/resources/views/partials/");
                           $path = $generator->makePartial($name, [], $force);
                           $ss->success("Partial '{$name}' created successfully");
-                          $ss->text("Path: " . $path);
+                          $ss->definitionList(['Path' => $path]);
                           return Command::SUCCESS;
                       } catch (MachinjiriException $e) {
                           $ss->error($e->getMessage());

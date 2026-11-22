@@ -8,7 +8,6 @@ use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Style\SymfonyStyle;
-use Symfony\Component\Console\Helper\Table;
 use Mlangeni\Machinjiri\Core\Exceptions\MachinjiriException;
 use Mlangeni\Machinjiri\Core\Artisans\Generators\ServiceProviderGenerator;
 
@@ -112,11 +111,11 @@ class ServiceProviderCommand
                         } else {
                             $result = $generator->generate($service, $options);
                             if (count($result) > 0) {
-                                $ss->success("Service Provider generated successfully \n");
+                                $ss->success('Service provider generated successfully.');
                                 $ss->listing($result);
                                 return Command::SUCCESS;
                             } else {
-                                $ss->error("Could not generate Service Provider \n");
+                                $ss->error('Could not generate service provider.');
                                 return Command::FAILURE;
                             }
                         }
@@ -158,10 +157,10 @@ class ServiceProviderCommand
                         $result = $generator->remove($service, $removeConfig, true);
 
                         if ($result) {
-                            $ss->success("Service Provider removed successfully \n");
+                            $ss->success('Service provider removed successfully.');
                             return Command::SUCCESS;
                         } else {
-                            $ss->error("Could not remove Service Provider \n");
+                            $ss->error('Could not remove service provider.');
                             return Command::FAILURE;
                         }
                     });
@@ -191,24 +190,23 @@ class ServiceProviderCommand
                         }
 
                         if ($input->getOption('details')) {
-                            $table = new Table($output);
-                            $table->setHeaders(['Name', 'File', 'Path', 'Class', 'Exists']);
+                            $rows = [];
                             foreach ($providers as $provider) {
-                                $table->addRow([
+                                $rows[] = [
                                     $provider['name'],
                                     $provider['file'],
                                     $provider['path'],
                                     $provider['class'],
                                     $provider['exists'] ? 'Yes' : 'No',
-                                ]);
+                                ];
                             }
-                            $table->render();
+                            $ss->table(['Name', 'File', 'Path', 'Class', 'Exists'], $rows);
                         } else {
                             $providerNames = array_column($providers, 'name');
                             $ss->listing($providerNames);
                         }
 
-                        $ss->success(sprintf('Found %d service provider(s)', count($providers)));
+                        $ss->success(sprintf('Found %d service provider(s).', count($providers)));
                         return Command::SUCCESS;
                     });
                 }
@@ -274,8 +272,8 @@ class ServiceProviderCommand
                         }
 
                         $result = $generator->generateFromStub($service, $stubName, $replacements);
-                        $ss->success("Service Provider created from stub '{$stubName}' successfully");
-                        $ss->text("File: {$result}");
+                        $ss->success("Service provider created from stub '{$stubName}'.");
+                        $ss->definitionList(['File' => $result]);
                         return Command::SUCCESS;
                     });
                 }
@@ -307,7 +305,7 @@ class ServiceProviderCommand
                         $providersConfig = getcwd() . '/config/providers.php';
                         if (!file_exists($providersConfig)) {
                             $generator->createDefaultProvidersConfig();
-                            $ss->text("Created providers.php configuration file");
+                            $ss->note('Created providers.php configuration file.');
                         }
 
                         $config = require $providersConfig;
@@ -317,7 +315,6 @@ class ServiceProviderCommand
                         if (!in_array($providerClass, $config['providers'] ?? [])) {
                             $config['providers'][] = $providerClass;
                             $updated = true;
-                            $ss->text("Added to providers array");
                         }
 
                         if ($input->getOption('deferred')) {
@@ -327,16 +324,21 @@ class ServiceProviderCommand
                             if (!in_array($providerClass, $config['deferred'])) {
                                 $config['deferred'][] = $providerClass;
                                 $updated = true;
-                                $ss->text("Added to deferred providers array");
                             }
                         }
 
                         if ($updated) {
                             $content = "<?php\nreturn " . var_export($config, true) . ";\n";
                             file_put_contents($providersConfig, $content);
-                            $ss->success("Service Provider registered successfully in providers.php");
+                            $ss->success('Service provider registered in providers.php.');
+                            $isDeferred = isset($config['deferred']) && in_array($providerClass, $config['deferred']);
+                            $ss->definitionList(
+                                ['Provider' => $providerClass],
+                                ['Registered' => 'Yes'],
+                                ['Deferred' => $isDeferred ? 'Yes' : 'No']
+                            );
                         } else {
-                            $ss->warning("Service Provider is already registered");
+                            $ss->warning('Service provider is already registered.');
                         }
 
                         return Command::SUCCESS;
@@ -388,20 +390,19 @@ class ServiceProviderCommand
                             unset($config['providers'][$key]);
                             $config['providers'] = array_values($config['providers']);
                             $updated = true;
-                            $ss->text("Removed from providers array");
                         }
 
                         if (isset($config['deferred']) && ($key = array_search($providerClass, $config['deferred'])) !== false) {
                             unset($config['deferred'][$key]);
                             $config['deferred'] = array_values($config['deferred']);
                             $updated = true;
-                            $ss->text("Removed from deferred providers array");
                         }
 
                         if ($updated) {
                             $content = "<?php\nreturn " . var_export($config, true) . ";\n";
                             file_put_contents($providersConfig, $content);
-                            $ss->success("Service Provider unregistered successfully from providers.php");
+                            $ss->success('Service provider unregistered from providers.php.');
+                            $ss->definitionList(['Provider' => $providerClass]);
                         } else {
                             $ss->warning("Service Provider was not found in providers.php");
                         }
@@ -444,12 +445,11 @@ class ServiceProviderCommand
                         $configFile = getcwd() . '/config/' . $configName . '.php';
 
                         $info = [
-                            ['Property', 'Value'],
-                            ['Name', $service],
-                            ['Class', $providerClass],
-                            ['File', $providerFile],
-                            ['Exists', file_exists($providerFile) ? 'Yes' : 'No'],
-                            ['Class Exists', class_exists($providerClass) ? 'Yes' : 'No'],
+                            'Name' => $service,
+                            'Class' => $providerClass,
+                            'File' => $providerFile,
+                            'Exists' => file_exists($providerFile) ? 'Yes' : 'No',
+                            'Class Exists' => class_exists($providerClass) ? 'Yes' : 'No',
                         ];
 
                         if (file_exists($providerFile)) {
@@ -457,30 +457,33 @@ class ServiceProviderCommand
 
                             preg_match('/protected bool \$defer = (true|false);/', $content, $deferredMatch);
                             $deferred = $deferredMatch[1] ?? 'false';
-                            $info[] = ['Deferred', $deferred];
+                            $info['Deferred'] = $deferred;
 
                             preg_match('/protected array \$bindings = (\[.*?\]);/s', $content, $bindingsMatch);
                             if ($bindingsMatch) {
                                 eval('$bindings = ' . $bindingsMatch[1] . ';');
-                                $info[] = ['Bindings Count', count($bindings)];
+                                $info['Bindings Count'] = count($bindings);
                             }
 
                             preg_match('/protected array \$singletons = (\[.*?\]);/s', $content, $singletonsMatch);
                             if ($singletonsMatch) {
                                 eval('$singletons = ' . $singletonsMatch[1] . ';');
-                                $info[] = ['Singletons Count', count($singletons)];
+                                $info['Singletons Count'] = count($singletons);
                             }
 
                             preg_match('/protected array \$aliases = (\[.*?\]);/s', $content, $aliasesMatch);
                             if ($aliasesMatch) {
                                 eval('$aliases = ' . $aliasesMatch[1] . ';');
-                                $info[] = ['Aliases Count', count($aliases)];
+                                $info['Aliases Count'] = count($aliases);
                             }
                         }
 
-                        $table = new Table($output);
-                        $table->setRows($info);
-                        $table->render();
+                        $ss->section('Provider Details');
+                        $ss->definitionList(...array_map(
+                            static fn (string $key, $value): array => [$key => $value],
+                            array_keys($info),
+                            array_values($info)
+                        ));
 
                         $providersConfig = getcwd() . '/config/providers.php';
                         if (file_exists($providersConfig)) {
@@ -488,15 +491,17 @@ class ServiceProviderCommand
                             $isRegistered = in_array($providerClass, $config['providers'] ?? []);
                             $isDeferred = isset($config['deferred']) && in_array($providerClass, $config['deferred']);
 
-                            $ss->text("\nRegistration Status:");
-                            $ss->text(sprintf("Registered in providers.php: %s", $isRegistered ? 'Yes' : 'No'));
+                            $registration = ['Registered in providers.php' => $isRegistered ? 'Yes' : 'No'];
                             if ($isRegistered) {
-                                $ss->text(sprintf("Marked as deferred: %s", $isDeferred ? 'Yes' : 'No'));
+                                $registration['Marked as deferred'] = $isDeferred ? 'Yes' : 'No';
                             }
+                            $ss->section('Registration');
+                            $ss->definitionList($registration);
                         }
 
                         if (file_exists($configFile)) {
-                            $ss->text("\nConfiguration: Found at " . $configFile);
+                            $ss->section('Configuration');
+                            $ss->definitionList(['File' => $configFile], ['Status' => 'Found']);
                         }
 
                         return Command::SUCCESS;
@@ -549,8 +554,8 @@ class ServiceProviderCommand
                         $result = $generator->generateThirdPartyAuth($options);
 
                         if (count($result) > 0) {
-                            $ss->success("Third-Party Authentication setup completed successfully!\n");
-                            $ss->text("Created files:");
+                            $ss->success('Third-party authentication setup completed successfully.');
+                            $ss->section('Created Files');
                             $ss->listing($result);
 
                             $ss->section("Next Steps");

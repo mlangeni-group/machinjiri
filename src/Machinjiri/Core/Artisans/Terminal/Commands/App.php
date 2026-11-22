@@ -35,10 +35,10 @@ class App
                         $name = $input->getArgument('name');
                         $resourceGenerator = new ResourceGenerator($this->artisanContainer());
                         if ($resourceGenerator->create($name, 'controller')) {
-                            $ss->success("Controller Class '" . $name . "' created successfully");
+                            $ss->success("Controller created: {$name}");
                             return Command::SUCCESS;
                         } else {
-                            $ss->error("Unable to create app controller '" . $name . "' due to: class already exists or unreadable directory");
+                            $ss->error("Unable to create controller '{$name}'. It may already exist or the directory may be unreadable.");
                             return Command::FAILURE;
                         }
                     });
@@ -65,10 +65,10 @@ class App
                         $name = $input->getArgument('name');
                         $resourceGenerator = new ResourceGenerator($this->artisanContainer());
                         if ($resourceGenerator->create($name, 'model')) {
-                            $ss->success("Model Class '" . $name . "' created successfully");
+                            $ss->success("Model created: {$name}");
                             return Command::SUCCESS;
                         } else {
-                            $ss->error("Unable to create Model Class '" . $name . "' due to: class already exists or unreadable directory");
+                            $ss->error("Unable to create model '{$name}'. It may already exist or the directory may be unreadable.");
                             return Command::FAILURE;
                         }
                     });
@@ -95,10 +95,10 @@ class App
                         $name = $input->getArgument('name');
                         $resourceGenerator = new ResourceGenerator($this->artisanContainer());
                         if ($resourceGenerator->create($name, 'middleware')) {
-                            $ss->success("Middleware Class '" . $name . "' created successfully");
+                            $ss->success("Middleware created: {$name}");
                             return Command::SUCCESS;
                         } else {
-                            $ss->error("Unable to create Middleware Class '" . $name . "' due to: class already exists or unreadable directory");
+                            $ss->error("Unable to create middleware '{$name}'. It may already exist or the directory may be unreadable.");
                             return Command::FAILURE;
                         }
                     });
@@ -119,11 +119,18 @@ class App
                     return $this->executeWithStyle($input, $output, 'App Environment Configurations', function (SymfonyStyle $ss) {
                         $dotEnv = new DotEnv($this->artisanContainer(), true);
                         $dotEnv->load();
-                        $vars = [];
-                        foreach ($dotEnv->getVariables() as $key => $value) {
-                            $vars[] = $key . " = " . $value;
+                        $variables = $dotEnv->getVariables();
+                        if ($variables === []) {
+                            $ss->note('No environment variables were found.');
+                            return Command::SUCCESS;
                         }
-                        $ss->listing($vars);
+
+                        $ss->section('Environment variables');
+                        $ss->definitionList(...array_map(
+                            static fn ($key, $value): array => [$key, $value],
+                            array_keys($variables),
+                            array_values($variables)
+                        ));
                         return Command::SUCCESS;
                     });
                 }
