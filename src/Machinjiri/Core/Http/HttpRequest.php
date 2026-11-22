@@ -6,7 +6,7 @@ use Mlangeni\Machinjiri\Core\Http\HttpClient;
 use Mlangeni\Machinjiri\Core\Authentication\Session;
 use Mlangeni\Machinjiri\Core\Authentication\Cookie;
 use Mlangeni\Machinjiri\Core\Authentication\OAuth;
-use Mlangeni\Machinjiri\Core\Exceptions\MachinjiriException;
+use Mlangeni\Machinjiri\Core\Exceptions\HttpException;
 
 /**
  * Behaviour changes:
@@ -197,6 +197,15 @@ class HttpRequest
             'te', 'trailers', 'transfer-encoding', 'upgrade', 'host', 'content-length',
         ];
 
+        $connection = $this->getHeader('Connection', '');
+        if (is_string($connection)) {
+            foreach (array_map('trim', explode(',', $connection)) as $headerName) {
+                if ($headerName !== '') {
+                    $hopHeaders[] = strtolower($headerName);
+                }
+            }
+        }
+
         $headers = [];
         foreach ($this->headers as $name => $value) {
             if (in_array(strtolower((string) $name), $hopHeaders, true)) {
@@ -209,14 +218,61 @@ class HttpRequest
         $this->applyOAuthHeaders($headers);
 
         $isJson = stripos($this->getContentType(), 'application/json') !== false;
+        $jsonBody = null;
+        $validJsonBody = false;
+        if ($isJson && $this->body !== '') {
+            $jsonBody = json_decode($this->body, true);
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                throw new HttpException('Forwarded request body contains invalid JSON');
+            }
+            $validJsonBody = true;
+        }
 
         return match ($method) {
-            'GET'    => $this->get($url, array_merge($this->queryParams, $additionalData), $headers),
-            'POST'   => $this->post($url, array_merge($this->postData, $additionalData), $headers, $isJson),
-            'PUT'    => $this->put($url, array_merge($this->postData, $additionalData), $headers, $isJson),
-            'PATCH'  => $this->patch($url, array_merge($this->postData, $additionalData), $headers, $isJson),
-            'DELETE' => $this->delete($url, $additionalData, $headers),
-            default  => throw new MachinjiriException("Unsupported HTTP method: {$method}"),
+            'GET' => $this->get(
+                $url,
+                array_merge($this->queryParams, $additionalData),
+                $headers
+            ),
+            'POST', 'PUT', 'PATCH' => (function () use ($url, $method, $additionalData, $headers, $isJson, $jsonBody) {
+                if ($isJson) {
+                    if ($additionalData === []) {
+                        $data = $this->body !== '' ? $this->body : $this->postData;
+                    } elseif (is_array($jsonBody)) {
+                        $data = array_merge($jsonBody, $additionalData);
+                    } else {
+                        throw new HttpException('Cannot merge additional data into a scalar or empty JSON body');
+                    }
+                    return match ($method) {
+                        'POST'  => $this->post($url, $data, $headers, true),
+                        'PUT'   => $this->put($url, $data, $headers, true),
+                        'PATCH' => $this->patch($url, $data, $headers, true),
+                    };
+                }
+
+                $data = array_merge($this->postData, $additionalData);
+                return match ($method) {
+                    'POST'  => $this->post($url, $data, $headers, false),
+                    'PUT'   => $this->put($url, $data, $headers, false),
+                    'PATCH' => $this->patch($url, $data, $headers, false),
+                };
+            })(),
+            'DELETE' => (function () use ($url, $additionalData, $headers, $isJson, $jsonBody, $validJsonBody) {
+                if (!$isJson) {
+                    return $this->delete($url, $additionalData, $headers);
+                }
+                if (!$validJsonBody) {
+                    $data = $additionalData;
+                } elseif ($additionalData === []) {
+                    $data = $jsonBody;
+                } elseif (is_array($jsonBody)) {
+                    $data = array_merge($jsonBody, $additionalData);
+                } else {
+                    throw new HttpException('Cannot merge additional data into a scalar or empty JSON body');
+                }
+                return $this->delete($url, $data, $headers);
+            })(),
+            default => throw new HttpException("Unsupported HTTP method: {$method}"),
         };
     }
 
@@ -254,14 +310,14 @@ class HttpRequest
             'DELETE'  => $this->delete($url, $data, $headers),
             'HEAD'    => $this->head($url, $headers),
             'OPTIONS' => $this->options($url, $headers),
-            default   => throw new MachinjiriException("Unsupported API method: {$method}"),
+            default   => throw new HttpException("Unsupported API method: {$method}"),
         };
     }
 
     public function oauthApi(string $url, string $method = 'GET', $data = null, array $headers = []): HttpResponse
     {
         if (!$this->oauth || !$this->oauth->isAuthenticated()) {
-            throw new MachinjiriException('OAuth authentication required');
+            throw new HttpException('OAuth authentication required');
         }
         return $this->api($url, $method, $data, $headers);
     }
@@ -302,6 +358,18 @@ class HttpRequest
 
             $this->applyOAuthHeaders($hdrs);
 
+            $hasContentType = false;
+            foreach ($hdrs as $k => $v) {
+                if (is_string($k) && strcasecmp($k, 'Content-Type') === 0) {
+                    $hasContentType = true;
+                    break;
+                }
+                if (is_int($k) && is_string($v) && strncasecmp($v, 'Content-Type:', 13) === 0) {
+                    $hasContentType = true;
+                    break;
+                }
+            }
+
             $headerLines = [];
             foreach ($hdrs as $k => $v) {
                 $headerLines[] = is_int($k) ? $v : "{$k}: {$v}";
@@ -314,12 +382,32 @@ class HttpRequest
             ];
 
             if (in_array($method, ['POST', 'PUT', 'PATCH'], true)) {
-                $opts[CURLOPT_POSTFIELDS] = is_array($data) ? json_encode($data) : $data;
+                if (is_array($data)) {
+                    try {
+                        $opts[CURLOPT_POSTFIELDS] = json_encode($data, JSON_THROW_ON_ERROR);
+                    } catch (\JsonException $e) {
+                        throw new HttpException('Batch request JSON encoding failed: ' . $e->getMessage());
+                    }
+                    if (!$hasContentType) {
+                        $opts[CURLOPT_HTTPHEADER][] = 'Content-Type: application/json';
+                    }
+                } else {
+                    $opts[CURLOPT_POSTFIELDS] = $data;
+                }
             } elseif ($method === 'GET' && !empty($data) && is_array($data)) {
                 $sep = str_contains($url, '?') ? '&' : '?';
                 $opts[CURLOPT_URL] = $url . $sep . http_build_query($data);
             } elseif ($method === 'DELETE' && !empty($data)) {
-                $opts[CURLOPT_POSTFIELDS] = json_encode($data);
+                try {
+                    $opts[CURLOPT_POSTFIELDS] = is_string($data)
+                        ? $data
+                        : json_encode($data, JSON_THROW_ON_ERROR);
+                } catch (\JsonException $e) {
+                    throw new HttpException('Batch request JSON encoding failed: ' . $e->getMessage());
+                }
+                if (is_array($data) && !$hasContentType) {
+                    $opts[CURLOPT_HTTPHEADER][] = 'Content-Type: application/json';
+                }
             }
 
             $curlRequests[$key] = ['options' => $opts];
@@ -539,11 +627,11 @@ class HttpRequest
     {
         $contentType = $this->getHeader('Content-Type', '');
         if (!is_string($contentType) || stripos($contentType, 'application/json') === false) {
-            throw new MachinjiriException('Request body is not JSON');
+            throw new HttpException('Request body is not JSON');
         }
         $data = json_decode($this->body, $assoc);
         if (json_last_error() !== JSON_ERROR_NONE) {
-            throw new MachinjiriException('JSON decoding failed: ' . json_last_error_msg());
+            throw new HttpException('JSON decoding failed: ' . json_last_error_msg());
         }
         return $data;
     }
@@ -803,14 +891,19 @@ class HttpRequest
 
     public function input(string $key, $default = null)
     {
-        return $this->postData[$key] ?? $this->queryParams[$key] ?? $default;
+        return $this->postData[$key]
+            ?? $this->queryParams[$key]
+            ?? $this->files[$key]
+            ?? $default;
     }
 
     public function only(array $keys): array
     {
         $out = [];
         foreach ($keys as $key) {
-            $out[$key] = $this->input($key);
+            if ($this->has($key)) {
+                $out[$key] = $this->input($key);
+            }
         }
         return $out;
     }
@@ -826,7 +919,9 @@ class HttpRequest
 
     public function has(string $key): bool
     {
-        return isset($this->postData[$key]) || isset($this->queryParams[$key]);
+        return isset($this->postData[$key])
+            || isset($this->queryParams[$key])
+            || isset($this->files[$key]);
     }
 
     public function filled(string $key): bool
@@ -834,8 +929,8 @@ class HttpRequest
         return !empty($this->input($key));
     }
 
-    public function setMethod(string $method): void 
+    public function setMethod(string $method): void
     {
-        $this->method = $method;
+        $this->method = strtoupper(trim($method));
     }
 }

@@ -2,7 +2,8 @@
 
 namespace Mlangeni\Machinjiri\Core\Http;
 
-use Mlangeni\Machinjiri\Core\Exceptions\MachinjiriException;
+use Mlangeni\Machinjiri\Core\Exceptions\HttpException;
+use Mlangeni\Machinjiri\Core\Exceptions\HttpStatusException;
 
 /**
  * Behaviour changes:
@@ -92,6 +93,9 @@ class HttpResponse
 
     public function setStatusCode(int $code): self
     {
+        if ($code < 100 || $code > 599) {
+            throw new HttpStatusException($code, "Invalid HTTP status code");
+        }
         $this->statusCode = $code;
         return $this;
     }
@@ -103,7 +107,10 @@ class HttpResponse
 
     public function setHeader(string $name, string $value): self
     {
-        $this->headers[$name] = $value;
+        $name = $this->validateHeaderName($name);
+        $this->validateHeaderValue($name, $value);
+        $existingName = $this->findHeaderName($name);
+        $this->headers[$existingName ?? $name] = $value;
         return $this;
     }
 
@@ -113,19 +120,25 @@ class HttpResponse
      */
     public function addHeader(string $name, string $value): self
     {
-        if (!isset($this->headers[$name])) {
-            $this->headers[$name] = $value;
-        } elseif (is_array($this->headers[$name])) {
-            $this->headers[$name][] = $value;
+        $name = $this->validateHeaderName($name);
+        $this->validateHeaderValue($name, $value);
+        $existingName = $this->findHeaderName($name);
+        $key = $existingName ?? $name;
+
+        if (!isset($this->headers[$key])) {
+            $this->headers[$key] = $value;
+        } elseif (is_array($this->headers[$key])) {
+            $this->headers[$key][] = $value;
         } else {
-            $this->headers[$name] = [$this->headers[$name], $value];
+            $this->headers[$key] = [$this->headers[$key], $value];
         }
         return $this;
     }
 
     public function getHeader(string $name): ?string
     {
-        $v = $this->headers[$name] ?? null;
+        $existingName = $this->findHeaderName($name);
+        $v = $existingName === null ? null : ($this->headers[$existingName] ?? null);
         if (is_array($v)) {
             return $v[0] ?? null;
         }
@@ -137,7 +150,8 @@ class HttpResponse
      */
     public function getHeaderAll(string $name): array
     {
-        $v = $this->headers[$name] ?? null;
+        $existingName = $this->findHeaderName($name);
+        $v = $existingName === null ? null : ($this->headers[$existingName] ?? null);
         if ($v === null) {
             return [];
         }
@@ -151,7 +165,10 @@ class HttpResponse
 
     public function removeHeader(string $name): self
     {
-        unset($this->headers[$name]);
+        $existingName = $this->findHeaderName($name);
+        if ($existingName !== null) {
+            unset($this->headers[$existingName]);
+        }
         return $this;
     }
 
@@ -176,7 +193,7 @@ class HttpResponse
         $this->setHeader('Content-Type', 'application/json; charset=utf-8');
         $encoded = json_encode($data, $options);
         if ($encoded === false) {
-            throw new MachinjiriException('JSON encoding failed: ' . json_last_error_msg());
+            throw new HttpException('JSON encoding failed: ' . json_last_error_msg());
         }
         $this->body = $encoded;
         return $this;
@@ -196,10 +213,18 @@ class HttpResponse
     public function isRedirect(): bool      { return $this->statusCode >= 300 && $this->statusCode < 400; }
     public function isClientError(): bool   { return $this->statusCode >= 400 && $this->statusCode < 500; }
     public function isServerError(): bool   { return $this->statusCode >= 500; }
-    public function isEmpty(): bool         { return in_array($this->statusCode, [204, 304], true); }
+    public function isEmpty(): bool
+    {
+        return ($this->statusCode >= 100 && $this->statusCode < 200)
+            || in_array($this->statusCode, [204, 205, 304], true);
+    }
 
     public function redirect(string $url, int $statusCode = 302): self
     {
+        if ($statusCode < 300 || $statusCode >= 400) {
+            throw new HttpStatusException($code, "Invalid redirect status code");
+        }
+        $this->validateHeaderValue('Location', $url);
         $this->setStatusCode($statusCode);
         $this->setHeader('Location', $url);
         return $this;
@@ -219,16 +244,23 @@ class HttpResponse
         bool $httponly = false,
         string $samesite = ''
     ): self {
-        if (!preg_match("/^[!#$%&'*+\\-.^_`|~0-9A-Za-z]+$/", $name)) {
-            throw new MachinjiriException("Invalid cookie name: {$name}");
+        if (!preg_match("/^[!#$%&'*+\\-.^_`|~0-9A-Za-z]+\\z/D", $name)) {
+            throw new HttpException("Invalid cookie name: {$name}");
         }
 
         $samesite = $samesite === '' ? '' : ucfirst(strtolower($samesite));
         if ($samesite === 'None' && !$secure) {
-            throw new MachinjiriException('SameSite=None requires Secure=true');
+            throw new HttpException('SameSite=None requires Secure=true');
         }
         if ($samesite !== '' && !in_array($samesite, ['Lax', 'Strict', 'None'], true)) {
-            throw new MachinjiriException("Invalid SameSite value: {$samesite}");
+            throw new HttpException("Invalid SameSite value: {$samesite}");
+        }
+        if ($path !== '' && (!str_starts_with($path, '/')
+            || preg_match('/[\x00-\x1F\x7F;]/', $path) === 1)) {
+            throw new HttpException('Invalid cookie path');
+        }
+        if ($domain !== '' && preg_match('/[\x00-\x20\x7F;,]/', $domain) === 1) {
+            throw new HttpException('Invalid cookie domain');
         }
 
         $cookie = sprintf('%s=%s', $name, rawurlencode($value));
@@ -292,6 +324,8 @@ class HttpResponse
         }
         http_response_code(103);
         foreach ($links as $href => $as) {
+            $this->validateHeaderValue('Link', $href);
+            $this->validateHeaderValue('Link', $as);
             header(sprintf('Link: <%s>; rel=preload; as=%s', $href, $as), false);
         }
     }
@@ -307,7 +341,7 @@ class HttpResponse
         }
 
         if (headers_sent($file, $line)) {
-            throw new MachinjiriException("Headers already sent in {$file}:{$line}");
+            throw new HttpException("Headers already sent in {$file}:{$line}");
         }
 
         $statusText = self::STATUS_TEXTS[$this->statusCode] ?? 'Unknown Status';
@@ -319,9 +353,16 @@ class HttpResponse
 
         // Auto Content-Length for empty-body statuses / string bodies.
         if ($this->isEmpty()) {
-            unset($this->headers['Content-Length'], $this->headers['Transfer-Encoding']);
-        } elseif (!isset($this->headers['Content-Length'])
-               && !isset($this->headers['Transfer-Encoding'])) {
+            $contentLengthName = $this->findHeaderName('Content-Length');
+            $transferEncodingName = $this->findHeaderName('Transfer-Encoding');
+            if ($contentLengthName !== null) {
+                unset($this->headers[$contentLengthName]);
+            }
+            if ($transferEncodingName !== null) {
+                unset($this->headers[$transferEncodingName]);
+            }
+        } elseif ($this->findHeaderName('Content-Length') === null
+               && $this->findHeaderName('Transfer-Encoding') === null) {
             $this->headers['Content-Length'] = (string) strlen($this->body);
         }
 
@@ -386,5 +427,30 @@ class HttpResponse
     public static function getStatusTexts(): array 
     {
         return self::STATUS_TEXTS;
+    }
+
+    private function findHeaderName(string $name): ?string
+    {
+        foreach (array_keys($this->headers) as $existingName) {
+            if (strcasecmp($existingName, $name) === 0) {
+                return $existingName;
+            }
+        }
+        return null;
+    }
+
+    private function validateHeaderName(string $name): string
+    {
+        if ($name === '' || preg_match('/^[!#$%&\'*+\-.^_`|~0-9A-Za-z]+$/D', $name) !== 1) {
+            throw new HttpException("Invalid HTTP header name: {$name}");
+        }
+        return $name;
+    }
+
+    private function validateHeaderValue(string $name, string $value): void
+    {
+        if (preg_match('/[\x00-\x08\x0A-\x1F\x7F]/', $value) === 1) {
+            throw new HttpException("Invalid HTTP header value for {$name}");
+        }
     }
 }
