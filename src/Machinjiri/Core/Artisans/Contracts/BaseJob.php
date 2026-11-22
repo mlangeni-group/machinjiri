@@ -15,7 +15,7 @@ abstract class BaseJob implements JobInterface
 {
     protected string $id;
     protected string $name;
-    protected array $payload;
+    protected array|string $payload;
     protected int $attempts = 0;
     protected int $maxAttempts = 3;
     protected string $queue = 'default';
@@ -233,8 +233,7 @@ abstract class BaseJob implements JobInterface
             $payload = $payload['compressed'];
         }
 
-        $job = new static($app, $payload, [
-            'id'              => $data['id'] ?? $this->generateJobId(),
+        $options = [
             'name'            => $data['name'] ?? static::class,
             'maxAttempts'     => $data['maxAttempts'] ?? 3,
             'queue'           => $data['queue'] ?? 'default',
@@ -244,7 +243,16 @@ abstract class BaseJob implements JobInterface
             'metadata'        => $data['metadata'] ?? [],
             'compressPayload' => $compressPayload,
             'precompressed'   => true,
-        ]);
+        ];
+
+        if (isset($data['id'])) {
+            $options['id'] = $data['id'];
+        }
+
+        $job = new static($app, $compressPayload ? [] : $payload, $options);
+        if ($compressPayload) {
+            $job->payload = $payload;
+        }
         
         if (isset($data['attempts'])) {
             $job->attempts = (int) $data['attempts'];
@@ -260,14 +268,24 @@ abstract class BaseJob implements JobInterface
     
     protected function compressPayload(array $payload): string
     {
-        return (new Cipher(self::KEY))
-            ->encrypt(gzcompress(serialize($payload), 1));
+        $cipher = new Cipher($this->app);
+        $cipher->setSecret(self::KEY);
+        return $cipher->encrypt(gzcompress(serialize($payload), 1));
     }
     
     protected function decompressPayload(string $compressed): array
     {
-        return (new Cipher(self::KEY))
-            ->decrypt(unserialize(gzuncompress($compressed)));
+        $cipher = new Cipher($this->app);
+        $cipher->setSecret(self::KEY);
+        $decompressed = gzuncompress($cipher->decrypt($compressed));
+        if ($decompressed === false) {
+            throw new JobException('Failed to decompress job payload', 60017);
+        }
+        $payload = unserialize($decompressed);
+        if (!is_array($payload)) {
+            throw new JobException('Invalid serialized job payload', 60018);
+        }
+        return $payload;
     }
 
     protected function calculateBackoffDelay(int $attempt): int
