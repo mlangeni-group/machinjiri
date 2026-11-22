@@ -32,6 +32,8 @@ class DatabaseConnection
         throw DatabaseException::ConnectionError("Cannot unserialize a singleton.");
     }
 
+    public function __construct(DatabaseConfiguration $dbCfg) { self::$databaseCfg = $dbCfg; }
+
     /**
      * __construct
      *
