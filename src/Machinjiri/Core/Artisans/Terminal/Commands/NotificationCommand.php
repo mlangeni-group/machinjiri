@@ -66,10 +66,11 @@ class NotificationCommand
                         $generator = new NotificationGenerator($this->artisanContainer());
 
                         if ($generator->create($name, $channels, $queueable)) {
-                            $ss->success("Notification Class '{$name}' created successfully");
-                            $ss->newLine();
-                            $ss->writeln("  <fg=gray>Channels:</> <fg=cyan>" . implode(', ', $channels) . "</>");
-                            $ss->writeln("  <fg=gray>Queueable:</> <fg=cyan>" . ($queueable ? 'yes' : 'no') . "</>");
+                            $ss->success("Notification class '{$name}' created successfully.");
+                            $ss->definitionList(
+                                ['Channels' => implode(', ', $channels)],
+                                ['Queueable' => $queueable ? 'Yes' : 'No']
+                            );
                             return Command::SUCCESS;
                         }
 
@@ -109,9 +110,9 @@ class NotificationCommand
                         foreach ($channels as $name) {
                             try {
                                 $instance = $manager->channels()->channel($name);
-                                $rows[] = [$name, is_object($instance) ? get_class($instance) : "callback function", '<fg=green>Ok</>'];
+                                $rows[] = [$name, is_object($instance) ? get_class($instance) : 'Callback function', 'Available'];
                             } catch (\Throwable $e) {
-                                $rows[] = [$name, '—', '<fg=red>' . $e->getMessage() . '</>'];
+                                $rows[] = [$name, '—', 'Error: ' . $e->getMessage()];
                             }
                         }
 
@@ -238,7 +239,7 @@ class NotificationCommand
                         $ss->section('Constructor');
                         $ctor = $ref->getConstructor();
                         if (!$ctor || $ctor->getNumberOfParameters() === 0) {
-                            $ss->writeln('<fg=gray>No constructor parameters.</>');
+                            $ss->note('No constructor parameters.');
                         } else {
                             $ctorRows = [];
                             foreach ($ctor->getParameters() as $param) {
@@ -332,8 +333,11 @@ class NotificationCommand
                                     $ss->writeln(json_encode(['queued' => true, 'job_ids' => $ids], JSON_PRETTY_PRINT));
                                 } else {
                                     $ss->success('Notification queued.');
-                                    foreach ($ids as $id) {
-                                        $ss->writeln("  <fg=gray>job id:</> <fg=cyan>{$id}</>");
+                                    if ($ids) {
+                                        $ss->table(['Job ID'], array_map(
+                                            static fn ($id): array => [$id],
+                                            $ids
+                                        ));
                                     }
                                 }
                                 return Command::SUCCESS;
@@ -427,11 +431,11 @@ class NotificationCommand
                     }
 
                     $ss->table(['Channel', 'Status', 'Detail'], $rows);
-
-                    $ss->writeln('');
-                    $ss->writeln($result->isSuccessful()
-                        ? '  <fg=green>All channels delivered.</>'
-                        : '  <fg=red>One or more channels failed.</>');
+                    if ($result->isSuccessful()) {
+                        $ss->success('All channels delivered.');
+                    } else {
+                        $ss->error('One or more channels failed.');
+                    }
                 }
             },
 
@@ -532,9 +536,11 @@ class NotificationCommand
                             }
                         };
 
-                        $ss->writeln("  <fg=gray>Channel:</>  <fg=cyan>{$channel}</>");
-                        $ss->writeln("  <fg=gray>Target:</>   " . ($to ?: '<fg=yellow>(default from routeNotificationFor)</>'));
-                        $ss->newLine();
+                        $ss->section('Test Details');
+                        $ss->definitionList(
+                            ['Channel' => $channel],
+                            ['Target' => $to ?: '(default from routeNotificationFor)']
+                        );
 
                         $result = $manager->send($notifiable, $notification);
 

@@ -6,7 +6,7 @@ use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Input\{InputOption, InputArgument, InputInterface};
 use Symfony\Component\Console\Style\SymfonyStyle;
-use Symfony\Component\Console\Helper\{Table, ProgressBar};
+use Symfony\Component\Console\Helper\ProgressBar;
 use Mlangeni\Machinjiri\Core\Artisans\Contracts\{BaseWorker, BackgroundWorkerManager};
 use Mlangeni\Machinjiri\Core\Artisans\Contracts\Schema\DatabaseQueueSchema;
 use Mlangeni\Machinjiri\Core\Artisans\Generators\QueueJobGenerator;
@@ -129,9 +129,13 @@ trait QueueCommandHelper
             return $callback($input, $output);
         } catch (\Throwable $e) {
             $io = new SymfonyStyle($input, $output);
-            $io->error($e->getMessage() . " in: [" . $e->getFile() . "] on line: ". $e->getLine());
+            $io->error($e->getMessage());
+            $io->definitionList(
+                ['File' => $e->getFile()],
+                ['Line' => $e->getLine()]
+            );
             if ($output->isVerbose()) {
-                $io->writeln("<error>{$e->getTraceAsString()}</error>");
+                $io->text('Trace: ' . $e->getTraceAsString());
             }
             return Command::FAILURE;
         }
@@ -179,7 +183,7 @@ trait QueueCommandHelper
             $this->ensureDatabaseQueueTables();
         } catch (\Throwable $e) {
             $io->error('Database queue tables could not be created. Please run "php artisan queue:init" first.');
-            $io->writeln('Error: ' . $e->getMessage());
+            $io->text('Details: ' . $e->getMessage());
             exit(Command::FAILURE);
         }
     }
@@ -354,16 +358,16 @@ class ArtisanBackgroundWorker {
         $lastHeartbeat = 0;
 
         $this->ss->title("Queue Worker");
-        $this->ss->text([
-            "Queue: <info>{$queue}</info>",
-            "Sleep: <info>{$sleep}s</info>",
-            "Memory: <info>{$memory}MB</info>",
-            "Timeout: <info>{$timeout}s</info>",
-            "Max Tries: <info>{$tries}</info>",
-            $maxJobs ? "Max Jobs: <info>{$maxJobs}</info>" : "Max Jobs: <info>unlimited</info>",
-            $stopOnEmpty ? "Stop on Empty: <info>yes</info>" : "Stop on Empty: <info>no</info>",
-            $daemon ? "Mode: <info>daemon</info>" : "Mode: <info>single run</info>",
-        ]);
+        $this->ss->definitionList(
+            ['Queue' => $queue],
+            ['Sleep' => "{$sleep}s"],
+            ['Memory' => "{$memory} MB"],
+            ['Timeout' => "{$timeout}s"],
+            ['Max tries' => $tries],
+            ['Max jobs' => $maxJobs ?: 'Unlimited'],
+            ['Stop on empty' => $stopOnEmpty ? 'Yes' : 'No'],
+            ['Mode' => $daemon ? 'Daemon' : 'Single run']
+        );
 
         $signalManager = new SignalManager();
         $worker = null;
@@ -383,7 +387,7 @@ class ArtisanBackgroundWorker {
             }
 
             $this->ss->newLine();
-            $this->ss->writeln("Starting worker... Press Ctrl+C to stop.");
+            $this->ss->note('Worker started. Press Ctrl+C to stop.');
 
             $startTime = time();
             try {
@@ -398,13 +402,13 @@ class ArtisanBackgroundWorker {
 
             $this->ss->newLine(2);
             $this->ss->section("Worker Statistics");
-            $this->ss->text([
-                "Runtime: <info>" . ($endTime - $startTime) . "s</info>",
-                "Jobs Processed: <info>{$status['processed']}</info>",
-                "Jobs Failed: <info>{$status['failed']}</info>",
-                "Memory Peak: <info>" . round($status['memory_peak'] / 1024 / 1024, 2) . "MB</info>",
-                "Last Job: <info>" . ($status['last_job_at'] ? date('Y-m-d H:i:s', $status['last_job_at']) : 'Never') . "</info>",
-            ]);
+            $this->ss->definitionList(
+                ['Runtime' => ($endTime - $startTime) . 's'],
+                ['Jobs processed' => $status['processed']],
+                ['Jobs failed' => $status['failed']],
+                ['Peak memory' => round($status['memory_peak'] / 1024 / 1024, 2) . ' MB'],
+                ['Last job' => $status['last_job_at'] ? date('Y-m-d H:i:s', $status['last_job_at']) : 'Never']
+            );
 
             if ($daemon && ($status['processed'] ?? 0) === 0) {
                 sleep(1);
@@ -468,7 +472,11 @@ class QueueWorkerCommand
 
                         $file = $this->queueGenerator()->generateQueueDriver($name, $options);
                         $ss->success('Queue driver created successfully!');
-                        $ss->text(['File: ' . $file, 'Type: ' . $options['type']]);
+                        $ss->definitionList(
+                            ['Driver' => $name],
+                            ['Type' => $options['type']],
+                            ['File' => $file]
+                        );
 
                         $usage = $this->queueGenerator()->generateCommandUsage($name, $options['type']);
                         $ss->section('Command Line Usage');
@@ -495,7 +503,7 @@ class QueueWorkerCommand
 
                         $driverName = $this->driverName();
 
-                        $ss->text("Queue Driver : " . strtoupper($driverName));
+                        $ss->definitionList(['Queue driver' => strtoupper($driverName)]);
 
                         if (strtolower($driverName) !== "database") {
                             $ss->success('Initialization successfull');
@@ -603,8 +611,8 @@ class QueueWorkerCommand
                         
                         if ($daemon) {
                             $ss->note("Starting supervisor for {$driver}:{$queue} with {$concurrency} workers. Press Ctrl+C to stop.");
-                            $manager->monitorWorker($queue, $driver, $concurrency, function($msg) use ($output) {
-                                $output->writeln($msg);
+                            $manager->monitorWorker($queue, $driver, $concurrency, function($msg) use ($ss) {
+                                $ss->text($msg);
                             });
                             return Command::SUCCESS;
                         }
@@ -616,7 +624,7 @@ class QueueWorkerCommand
                             $ss->success("Already have {$running} worker(s) running.");
                         } else {
                             $needed = $concurrency - $running;
-                            $ss->text("Starting {$needed} worker(s)...");
+                            $ss->note("Starting {$needed} worker(s)...");
                             $started = $manager->startWorker($queue, $driver, $needed);
                             $ss->success("Started {$started} worker(s).");
                         }
@@ -758,19 +766,19 @@ class QueueWorkerCommand
                             return Command::SUCCESS;
                         }
                         
-                        $table = new Table($output);
-                        $table->setHeaders(['Instance', 'PID', 'Running', 'Healthy', 'Memory (MB)', 'Last Heartbeat']);
+                        $rows = [];
                         foreach ($statuses as $status) {
-                            $table->addRow([
+                            $rows[] = [
                                 $status['instance'],
                                 $status['pid'] ?? '-',
-                                $status['running'] ? 'Yes' : 'No',
-                                $status['healthy'] ? 'Yes' : ($status['running'] ? 'No' : '-'),
+                                $status['running'] ? '<info>Running</info>' : '<comment>Stopped</comment>',
+                                $status['healthy'] ? '<info>Healthy</info>' : ($status['running'] ? '<error>Unhealthy</error>' : '-'),
                                 isset($status['memory_mb']) ? round($status['memory_mb'], 2) : '-',
                                 isset($status['last_heartbeat']) ? date('Y-m-d H:i:s', $status['last_heartbeat']) : '-',
-                            ]);
+                            ];
                         }
-                        $table->render();
+                        $ss->section("Workers for {$driver}:{$queue}");
+                        $ss->table(['Instance', 'PID', 'Status', 'Health', 'Memory (MB)', 'Last Heartbeat'], $rows);
                         
                         return Command::SUCCESS;
                     });
@@ -834,22 +842,22 @@ class QueueWorkerCommand
 
                         $file = $generator->generateJob($name, $options);
                         $ss->success('Job created successfully!');
-                        $ss->text([
-                            'File: ' . $file,
-                            'Type: ' . $options['type'],
-                            'Queue: ' . $options['queue'],
-                            'Max Attempts: ' . $options['max_attempts'],
-                            'Timeout: ' . $options['timeout'] . 's',
-                        ]);
+                        $ss->definitionList(
+                            ['File' => $file],
+                            ['Type' => $options['type']],
+                            ['Queue' => $options['queue']],
+                            ['Max attempts' => $options['max_attempts']],
+                            ['Timeout' => $options['timeout'] . 's']
+                        );
 
                         $ss->section('Usage Example');
                         $ss->text([
                             'Dispatch job:',
-                            '  $job = new ' . str_replace('Job', '', $name) . 'Job($data);',
-                            '  $dispatcher->dispatch($job);',
+                            '$job = new ' . str_replace('Job', '', $name) . 'Job($data);',
+                            '$dispatcher->dispatch($job);',
                             '',
                             'Or use the command:',
-                            '  php artisan queue:work --queue=' . $options['queue'],
+                            'php artisan queue:work --queue=' . $options['queue'],
                         ]);
 
                         return Command::SUCCESS;
@@ -885,24 +893,26 @@ class QueueWorkerCommand
 
                         $stats = [];
                         foreach ($queues as $queue) {
-                            $stats[] = $queueDriver->getStats($queue);
+                            $stats[] = ['queue' => $queue, 'stats' => $queueDriver->getStats($queue)];
                         }
 
                         if (empty($stats)) {
-                            $ss->warning('No queues found.');
+                            $ss->note('No queues found.');
                         } else {
-                            $table = new Table($output);
-                            $table->setHeaders(['Pending', 'Reserved', 'Delayed', 'Total', 'Health']);
-                            foreach ($stats as $stat) {
-                                $table->addRow([
+                            $rows = [];
+                            foreach ($stats as $result) {
+                                $stat = $result['stats'];
+                                $rows[] = [
+                                    $result['queue'],
                                     $stat['pending'] ?? 0,
                                     $stat['reserved'] ?? 0,
                                     $stat['delayed'] ?? 0,
                                     $stat['total'] ?? $stat['pending'] + $stat['reserved'] + $stat['delayed'],
                                     $queueDriver->isHealthy() ? '<info>Healthy</info>' : '<error>Unhealthy</error>'
-                                ]);
+                                ];
                             }
-                            $table->render();
+                            $ss->section('Queue Status');
+                            $ss->table(['Queue', 'Pending', 'Reserved', 'Delayed', 'Total', 'Health'], $rows);
                         }
 
                         return Command::SUCCESS;
@@ -941,11 +951,10 @@ class QueueWorkerCommand
                         $failedJobs = $queueDriver->getFailed($queue, $limit, $offset);
 
                         if (empty($failedJobs)) {
-                            $ss->success('No failed jobs found.');
+                            $ss->note('No failed jobs found.');
                         } else {
-                            $table = new Table($output);
-                            $table->setHeaders(['No', 'Job ID', 'Queue', 'Failed At', 'Error']);
-                            $rows = [];$count = 0;
+                            $rows = [];
+                            $count = 0;
                             foreach ($failedJobs as $job) {
                                 $count++;
                                 $rows[] = [
@@ -956,10 +965,9 @@ class QueueWorkerCommand
                                     substr($job['exception'] ?? 'No error message', 0, 15) . '...'
                                 ];
                             }
-                            $table->setRows($rows);
-                            $table->render();
-                            $ss->newLine();
-                            $ss->text("Total failed jobs: " . count($failedJobs));
+                            $ss->section('Failed Jobs');
+                            $ss->table(['No.', 'Job ID', 'Queue', 'Failed At', 'Error'], $rows);
+                            $ss->comment('Total failed jobs: ' . count($failedJobs));
                         }
 
                         return Command::SUCCESS;
@@ -1208,8 +1216,6 @@ class QueueWorkerCommand
                             'message'       => $message
                         ];
 
-                        $table = new Table($output);
-                        $table->setHeaders(['Driver name', 'Status', 'Response Time', 'Message']);
                         $rows = [];
                         foreach ($results as $result) {
                             $statusColor = $result['status'] === 'HEALTHY' ? 'info' : ($result['status'] === 'NOT FOUND' ? 'comment' : 'error');
@@ -1220,8 +1226,8 @@ class QueueWorkerCommand
                                 $result['message']
                             ];
                         }
-                        $table->setRows($rows);
-                        $table->render();
+                        $ss->section('Driver Health');
+                        $ss->table(['Driver', 'Status', 'Response time', 'Message'], $rows);
 
                         $healthyCount = count(array_filter($results, fn($r) => $r['status'] === 'HEALTHY'));
                         $totalCount   = count($results);
@@ -1252,8 +1258,28 @@ class QueueWorkerCommand
                         $connectionCfg = $this->getDbCfg();
                         
                         $ss->section('Database Configuration');
-                        foreach($connectionCfg->getConnCfg() as $k => $v) {
-                            $ss->writeln($k . " - " . $v);
+                        $details = [];
+                        foreach ($connectionCfg->getConnCfg() as $key => $value) {
+                            if (is_array($value)) {
+                                $value = json_encode(
+                                    $value,
+                                    JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR
+                                );
+                            } elseif (is_bool($value)) {
+                                $value = $value ? 'Yes' : 'No';
+                            } elseif ($value === null) {
+                                $value = 'null';
+                            } else {
+                                $value = (string) $value;
+                            }
+
+                            $details[] = [$key => $value];
+                        }
+
+                        if ($details === []) {
+                            $ss->note('No database connection details are configured.');
+                        } else {
+                            $ss->definitionList(...$details);
                         }
             
                         return Command::SUCCESS;
@@ -1307,7 +1333,8 @@ class QueueWorkerCommand
 
                         if (!isset($jobs[$jobName])) {
                             $ss->error("Job '{$jobName}' not found in jobs configuration.");
-                            $ss->writeln("Available jobs: " . implode(', ', array_keys($jobs)));
+                            $ss->text('Available jobs:');
+                            $ss->listing(array_keys($jobs));
                             return Command::FAILURE;
                         }
 

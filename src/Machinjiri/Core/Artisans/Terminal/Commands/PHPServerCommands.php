@@ -44,23 +44,26 @@ class PHPServerCommands
                         $result = $serverMgr->start();
 
                         if (isset($result['success']) && $result['success']) {
-                            $ss->success('Server Started :)');
-                            $ss->text($result['message']);
-                            $ss->section("Server Information");
-                            $ss->listing([
-                                "PID => " . $result['pid'],
-                                "address => " . $result['address'],
-                                "root => " . $result['document_root']
-                            ]);
-                            $ss->text("Open your web browser and navigate to http://" . $result['address'] . "/");
+                            $ss->success('Development server started');
+                            $ss->section('Server information');
+                            $ss->definitionList(
+                                ['Details' => $result['message']],
+                                ['PID' => $result['pid']],
+                                ['Address' => $result['address']],
+                                ['Document root' => $result['document_root']],
+                                ['URL' => 'http://' . $result['address'] . '/']
+                            );
                             return Command::SUCCESS;
                         } else {
                             $ss->error($result['message']);
-                            $ss->section("Available Commands. Choose either of the following");
-                            $ss->listing([
-                                'php artisan server:stop - To Stop the Server',
-                                'php artisan server:restart - To Restart the Server'
-                            ]);
+                            $ss->section('Available commands');
+                            $ss->table(
+                                ['Command', 'Action'],
+                                [
+                                    ['php artisan server:stop', 'Stop the server'],
+                                    ['php artisan server:restart', 'Restart the server'],
+                                ]
+                            );
                             return Command::FAILURE;
                         }
                     });
@@ -83,7 +86,7 @@ class PHPServerCommands
                         $result = $serverMgr->stop();
 
                         if (isset($result['success']) && $result['success']) {
-                            $ss->warning($result['message']);
+                            $ss->success($result['message']);
                             return Command::SUCCESS;
                         } else {
                             $ss->error($result['message']);

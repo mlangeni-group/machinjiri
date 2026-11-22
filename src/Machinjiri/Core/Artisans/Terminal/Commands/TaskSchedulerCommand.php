@@ -54,7 +54,7 @@ class TaskSchedulerCommand
                         }
 
                         if (count($tasks) === 0) {
-                            $io->text("There are no scheduled tasks at the moment");
+                            $io->note('No scheduled tasks found.');
                             return Command::SUCCESS;
                         }
 
@@ -72,8 +72,9 @@ class TaskSchedulerCommand
                             ];
                         }
                 
+                        $io->section('Scheduled Tasks');
                         $io->table(['ID', 'Name', 'Cron', 'Priority', 'Group', 'Enabled', 'Next Run'], $rows);
-                        $io->text(sprintf("Total: %d tasks", count($tasks)));
+                        $io->comment(sprintf('Total: %d task(s)', count($tasks)));
                         return Command::SUCCESS;
                     });
                 }
@@ -109,7 +110,13 @@ class TaskSchedulerCommand
                         
                         try {
                             $taskFile = $taskGenerator->generateTask($taskName, $type, $register, $cron);
-                            $io->success("Task created successfully: {$taskFile}");
+                            $io->success('Task created successfully.');
+                            $io->definitionList(
+                                ['Task file' => $taskFile],
+                                ['Type' => $type],
+                                ['Cron' => $cron],
+                                ['Registered' => $register ? 'Yes' : 'No']
+                            );
                             
                             if (!$register) {
                                 $io->note("Task was not registered. Run with --register to add it to configuration.");
@@ -190,16 +197,16 @@ class TaskSchedulerCommand
                         $status = $scheduler->getStatus();
                         
                         $io->section('Scheduler Status');
-                        $io->table(['Metric', 'Value'], [
-                            ['Status', $status['is_running'] ? 'Running' : 'Idle'],
-                            ['Total Tasks', $status['total_tasks']],
-                            ['Enabled Tasks', $status['enabled_tasks']],
-                            ['Due Tasks', $status['due_tasks']],
-                            ['Active Locks', $status['active_locks']],
-                            ['Default Queue', $status['default_queue']],
-                            ['Memory Usage', $this->formatBytes($status['memory_usage'])],
-                            ['Peak Memory', $this->formatBytes($status['peak_memory'])],
-                        ]);
+                        $io->definitionList(
+                            ['Status' => $status['is_running'] ? 'Running' : 'Idle'],
+                            ['Total tasks' => $status['total_tasks']],
+                            ['Enabled tasks' => $status['enabled_tasks']],
+                            ['Due tasks' => $status['due_tasks']],
+                            ['Active locks' => $status['active_locks']],
+                            ['Default queue' => $status['default_queue']],
+                            ['Memory usage' => $this->formatBytes($status['memory_usage'])],
+                            ['Peak memory' => $this->formatBytes($status['peak_memory'])]
+                        );
                         
                         return Command::SUCCESS;
                     });
@@ -345,17 +352,22 @@ class TaskSchedulerCommand
                             $stats = $taskManager->getTaskStats((int)$taskId);
                             $task = $taskManager->getTask((int)$taskId);
                             
-                            $io->section("Stats for: {$task['name']}");
-                            $io->table(['Metric', 'Value'], [
-                                ['Total Executions', $stats['total_executions']],
-                                ['Success Count', $stats['success_count']],
-                                ['Failed Count', $stats['failed_count']],
-                                ['Success Rate', number_format($stats['success_rate'], 2) . '%'],
-                                ['Average Duration', number_format($stats['average_duration'], 2) . 's'],
-                                ['Last Execution', $stats['last_execution_time'] ? date('Y-m-d H:i:s', $stats['last_execution_time']) : 'Never'],
-                            ]);
+                            $io->section("Statistics: {$task['name']}");
+                            $io->definitionList(
+                                ['Total executions' => $stats['total_executions']],
+                                ['Successful' => $stats['success_count']],
+                                ['Failed' => $stats['failed_count']],
+                                ['Success rate' => number_format($stats['success_rate'], 2) . '%'],
+                                ['Average duration' => number_format($stats['average_duration'], 2) . 's'],
+                                ['Last execution' => $stats['last_execution_time'] ? date('Y-m-d H:i:s', $stats['last_execution_time']) : 'Never']
+                            );
                         } else {
                             $allStats = $taskManager->getAllStats();
+                            if (empty($allStats)) {
+                                $io->note('No task statistics available.');
+                                return Command::SUCCESS;
+                            }
+
                             $rows = [];
                             foreach ($allStats as $taskId => $stats) {
                                 $task = $taskManager->getTask($taskId);
@@ -370,6 +382,7 @@ class TaskSchedulerCommand
                                 ];
                             }
                             
+                            $io->section('Task Statistics');
                             $io->table(['ID', 'Name', 'Total', 'Success', 'Failed', 'Rate', 'Avg Duration'], $rows);
                         }
                         

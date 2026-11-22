@@ -78,28 +78,28 @@ class WebhookCommand
                         // 1. Generate Controller
                         if ($generateAll || $input->getOption('controller')) {
                             if ($this->generateController($normalizedName, $io)) {
-                                $created[] = 'Controller';
+                                $created[] = ['Controller', "app/Controllers/{$normalizedName}WebhookController.php"];
                             }
                         }
 
                         // 2. Update Configuration
                         if ($generateAll || $input->getOption('config')) {
                             if ($this->updateConfig($normalizedName, $io)) {
-                                $created[] = 'Configuration';
+                                $created[] = ['Configuration', 'config/core/webhooks.php'];
                             }
                         }
 
                         // 3. Generate Handler
                         if ($generateAll || $input->getOption('handler')) {
                             if ($this->generateHandler($normalizedName, $io)) {
-                                $created[] = 'Handler';
+                                $created[] = ['Handler', "app/Webhooks/Handlers/{$normalizedName}WebhookHandler.php"];
                             }
                         }
 
                         // 4. Generate Service Provider
                         if ($generateAll || $input->getOption('provider')) {
                             if ($this->generateServiceProvider($normalizedName, $io)) {
-                                $created[] = 'Service Provider';
+                                $created[] = ['Service provider', "app/Providers/{$normalizedName}WebhookServiceProvider.php"];
                             }
                         }
 
@@ -108,12 +108,20 @@ class WebhookCommand
                             return Command::SUCCESS;
                         }
 
-                        $io->success('Webhook components generated: ' . implode(', ', $created));
-                        $io->note("Don't forget to:");
-                        $io->text(" - Register the handler in your service provider (if not done automatically)");
+                        $io->success('Webhook generation complete');
+                        $io->section('Generated components');
+                        $io->table(
+                            ['Component', 'Location', 'Status'],
+                            array_map(static fn (array $component): array => [$component[0], $component[1], 'Created'], $created)
+                        );
+
+                        $io->section('Next steps');
+                        $io->note('Register the handler in your service provider if it was not added automatically.');
                         $route = strtolower($normalizedName);
-                        $io->text(" - Add the route: \$router->post('/webhook/{$route}', [{$normalizedName}WebhookController::class, 'handle'])");
-                        $io->text(" - Set the webhook secret in your .env file (e.g., {$normalizedName}_WEBHOOK_SECRET)");
+                        $io->definitionList(
+                            ['Route' => "\$router->post('/webhook/{$route}', [{$normalizedName}WebhookController::class, 'handle'])"],
+                            ['Environment variable' => "{$normalizedName}_WEBHOOK_SECRET"]
+                        );
 
                         return Command::SUCCESS;
                     });
@@ -131,7 +139,6 @@ class WebhookCommand
 
                     $template = $this->getControllerTemplate($name, $controllerName);
                     if ($this->writeFile($controllerPath, $template)) {
-                        $io->text("Created controller: app/Controllers/{$controllerName}.php");
                         return true;
                     }
                     $io->error("Failed to create controller: {$controllerName}");
@@ -177,8 +184,7 @@ class WebhookCommand
                     // Write config file with pretty printed array
                     $content = "<?php\n\nreturn [\n" . $this->varExportPretty($config, 1) . "\n];\n";
                     if ($this->writeFile($configFile, $content)) {
-                        $io->text("Updated configuration: config/core/webhooks.php");
-                        $io->text("  - You may want to adjust 'event_resolver' and 'verify' settings for your provider.");
+                        $io->note("Review the 'event_resolver' and 'verify' settings for your provider configuration.");
                         return true;
                     }
                     $io->error("Failed to update configuration.");
@@ -202,7 +208,6 @@ class WebhookCommand
 
                     $template = $this->getHandlerTemplate($name, $handlerName);
                     if ($this->writeFile($handlerPath, $template)) {
-                        $io->text("Created handler: app/Webhooks/Handlers/{$handlerName}.php");
                         return true;
                     }
                     $io->error("Failed to create handler: {$handlerName}");
@@ -225,8 +230,7 @@ class WebhookCommand
                             'aliases' => [],
                         ];
                         $files = $generator->generate($providerName, $options);
-                        $io->text("Created service provider: app/Providers/{$providerName}.php");
-                        $io->text("Registered provider in config/providers.php");
+                        $io->note('Service provider registered in config/providers.php.');
                         return true;
                     } catch (\Exception $e) {
                         $io->error("Failed to create service provider: " . $e->getMessage());

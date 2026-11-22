@@ -8,7 +8,6 @@ use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Style\SymfonyStyle;
-use Symfony\Component\Console\Helper\Table;
 use Mlangeni\Machinjiri\Core\Artisans\Generators\ResourceGenerator;
 use Mlangeni\Machinjiri\Core\Exceptions\MachinjiriException;
 use Mlangeni\Machinjiri\Core\Database\Seeder\SeederManager;
@@ -112,7 +111,9 @@ class DatabaseCommands extends Command
                             }
                         }
 
-                        $ss->success("Created: " . basename($creator->create($name, $bluePrint)));
+                        $file = basename($creator->create($name, $bluePrint));
+                        $ss->success('Migration created.');
+                        $ss->definitionList(['Name' => $name], ['File' => $file], ['Blueprint' => $bluePrint ? 'Yes' : 'No']);
                         return Command::SUCCESS;
                     });
                 }
@@ -131,7 +132,7 @@ class DatabaseCommands extends Command
                 {
                     return $this->executeWithStyle($input, $output, 'Database Migration [List Created Migrations]', function (SymfonyStyle $ss) {
                         $creator = $this->creator();
-                        $ss->section("List of Migrations");
+                        $ss->section('Migrations');
                         $files = [];
                         if (count($creator->getMigrationFiles()) > 0) {
                             foreach ($creator->getMigrationFiles() as $migration) {
@@ -167,7 +168,7 @@ class DatabaseCommands extends Command
                         $name = $input->getArgument('name');
                         $creator = $this->creator();
                         if ($creator->removeMigration($name)) {
-                            $ss->success("Deleted successfully: " . $name);
+                            $ss->success("Migration '{$name}' deleted.");
                         } else {
                             $ss->error("Unable to delete migration: " . $name);
                         }
@@ -291,7 +292,7 @@ class DatabaseCommands extends Command
                                     }
                                 }
                             }
-                            $listing[] = "Migration => " . basename($creator->create($seederName));
+                            $listing['Migration'] = basename($creator->create($seederName));
                         }
 
                         $seederManager = $this->seeder();
@@ -300,12 +301,16 @@ class DatabaseCommands extends Command
                         $seederPath = $seederManager->make($seederName);
 
                         if ($seederManager->created) {
-                            $listing[] = "Seeder => " . $seederName;
-                            $listing[] = "Path => " . basename($seederPath);
+                            $listing['Seeder'] = $seederName;
+                            $listing['Path'] = basename($seederPath);
 
-                            $ss->success("Seeder Created Successfully");
+                            $ss->success('Seeder created successfully.');
                             $ss->section('Creation Information');
-                            $ss->listing($listing);
+                            $ss->definitionList(...array_map(
+                                static fn (string $key, string $value): array => [$key => $value],
+                                array_keys($listing),
+                                array_values($listing)
+                            ));
                             return Command::SUCCESS;
                         } else {
                             $ss->error("Unable to create Seeder at the moment");
@@ -377,17 +382,21 @@ class DatabaseCommands extends Command
 
                         if (!$withTransaction) {
                             $results = $seederManager->runAll();
-                            $ss->success("All Seeders Ran Successfully");
-                            foreach ($results as $key => $result) {
-                                $ss->text($key . " - " . $result);
-                            }
+                            $ss->success('All seeders ran successfully.');
+                            $ss->table(['Seeder', 'Result'], array_map(
+                                static fn ($key, $result): array => [$key, $result],
+                                array_keys($results),
+                                array_values($results)
+                            ));
                             return Command::SUCCESS;
                         } else {
                             $results = $seederManager->runAllInTransaction();
-                            $ss->success("All Seeders Ran Successfully within a single transaction");
-                            foreach ($results as $key => $result) {
-                                $ss->text($key . " - " . $result);
-                            }
+                            $ss->success('All seeders ran successfully in a single transaction.');
+                            $ss->table(['Seeder', 'Result'], array_map(
+                                static fn ($key, $result): array => [$key, $result],
+                                array_keys($results),
+                                array_values($results)
+                            ));
                             return Command::SUCCESS;
                         }
                     });
@@ -415,9 +424,10 @@ class DatabaseCommands extends Command
                             return Command::SUCCESS;
                         }
                         
-                        foreach ($seeders as $seeder) {
-                            $ss->text("Seeder: " . $seeder['name']);
-                        }
+                        $ss->table(['Seeder'], array_map(
+                            static fn (array $seeder): array => [$seeder['name']],
+                            $seeders
+                        ));
 
                         return Command::SUCCESS;
                     });
@@ -439,10 +449,12 @@ class DatabaseCommands extends Command
                         $seederManager = $this->seeder();
                         $refreshed = (array) $seederManager->refresh();
                         if ($refreshed) {
-                            $ss->success("All Seeders Refreshed Successfully");
-                            foreach ($refreshed as $key => $result) {
-                                $ss->text($key . " - Status: " . ($result ? "Success" : "Failed"));
-                            }
+                            $ss->success('Seeders refreshed.');
+                            $ss->table(['Seeder', 'Status'], array_map(
+                                static fn ($key, $result): array => [$key, $result ? 'Success' : 'Failed'],
+                                array_keys($refreshed),
+                                array_values($refreshed)
+                            ));
                             return Command::SUCCESS;
                         } else {
                             $ss->error("Unable to refresh Seeders at the moment");
@@ -490,7 +502,7 @@ class DatabaseCommands extends Command
                                     }
                                 }
                             }
-                            $listing[] = "Migration => " . basename($creator->create($factoryName));
+                            $listing['Migration'] = basename($creator->create($factoryName));
                         }
 
                         $factoryManager = $this->factory();
@@ -498,12 +510,16 @@ class DatabaseCommands extends Command
                         $factoryPath = $factoryManager->make($factoryName);
 
                         if ($factoryManager->created) {
-                            $listing[] = "Factory : " . $factoryName;
-                            $listing[] = "Path : " . basename($factoryPath);
+                            $listing['Factory'] = $factoryName;
+                            $listing['Path'] = basename($factoryPath);
 
-                            $ss->success("Factory Created Successfully");
+                            $ss->success('Factory created successfully.');
                             $ss->section('Creation Information');
-                            $ss->listing($listing);
+                            $ss->definitionList(...array_map(
+                                static fn (string $key, string $value): array => [$key => $value],
+                                array_keys($listing),
+                                array_values($listing)
+                            ));
                             return Command::SUCCESS;
                         } else {
                             $ss->error("Unable to create Factory at the moment");
@@ -541,14 +557,14 @@ class DatabaseCommands extends Command
                         $records = ($fakeOnly) ? $factoryManager->fake($model, $recordCount) : $factoryManager->run($model, $recordCount);
 
                         if (count($records) === 0) {
-                            $ss->text("Factory faked no records");
+                            $ss->note('No records were generated.');
                             return Command::SUCCESS;
                         }
 
                         $records = $records['records'] ?? $records;
 
                         $count = count($records);
-                        $ss->success("$count} records were generated.");
+                        $ss->success("Generated {$count} records.");
                         return Command::SUCCESS;
                     });
                 }

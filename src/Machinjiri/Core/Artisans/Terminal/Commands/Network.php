@@ -98,14 +98,18 @@ class Network
                             $config->set('concurrent_pings', $concurrent);
                         }
 
-                        $ss->writeln("Scanning subnet {$subnet}...");
+                        $ss->note("Scanning subnet {$subnet}...");
                         $active = $manager->scanSubnet($subnet);
 
                         if (empty($active)) {
                             $ss->warning("No active hosts found.");
                         } else {
-                            $ss->success("Found " . count($active) . " active host(s):");
-                            $ss->listing($active);
+                            $ss->section('Active Hosts');
+                            $ss->table(['Host', 'Status'], array_map(
+                                static fn ($host) => [$host, 'Active'],
+                                $active
+                            ));
+                            $ss->success('Found ' . count($active) . ' active host(s).');
                         }
 
                         return Command::SUCCESS;
@@ -145,17 +149,18 @@ class Network
                         }
 
                         $manager = $this->networkManager();
-                        $ss->writeln("Scanning ports {$start}-{$end} on {$host}...");
+                        $ss->note("Scanning ports {$start}-{$end} on {$host}...");
                         $open = $manager->scanPorts($host, $start, $end, $timeout);
 
                         if (empty($open)) {
                             $ss->warning("No open ports found.");
                         } else {
-                            $ss->success("Found " . count($open) . " open port(s):");
                             $rows = array_map(function ($p) {
                                 return [$p['port'], $p['service']];
                             }, $open);
+                            $ss->section('Open Ports');
                             $ss->table(['Port', 'Service'], $rows);
+                            $ss->success("Found " . count($open) . " open port(s).");
                         }
 
                         return Command::SUCCESS;
@@ -195,6 +200,7 @@ class Network
                                 $iface->isLoopback() ? 'Yes' : 'No',
                             ];
                         }
+                        $ss->section('Network Interfaces');
                         $ss->table(['Name', 'IP', 'MAC', 'Network', 'Status', 'Loopback'], $rows);
                         return Command::SUCCESS;
                     });
@@ -241,26 +247,36 @@ class Network
                         }
 
                         if ($input->getOption('watch')) {
-                            $ss->writeln("Starting continuous monitoring (press Ctrl+C to stop) ...");
+                            $ss->note("Monitoring continuously; press Ctrl+C to stop.");
                             $manager->getMonitor()->watch(60, 0, function ($results) use ($ss) {
-                                // Clear previous output? We'll just print each result.
-                                $ss->newLine();
                                 $ss->section('Monitor Check at ' . date('Y-m-d H:i:s'));
-                                foreach ($results as $alias => $data) {
-                                    $status = $data['reachable'] ? '✅ UP' : '❌ DOWN';
-                                    $latency = $data['latency'] ?? 'N/A';
-                                    $ss->writeln("{$alias} ({$data['host']}) : {$status}  Latency: {$latency}ms");
-                                }
+                                $ss->table(
+                                    ['Alias', 'Host', 'Status', 'Latency'],
+                                    array_map(static function ($alias, $data) {
+                                        return [
+                                            $alias,
+                                            $data['host'],
+                                            $data['reachable'] ? '<info>UP</info>' : '<error>DOWN</error>',
+                                            ($data['latency'] ?? 'N/A') . ' ms',
+                                        ];
+                                    }, array_keys($results), array_values($results))
+                                );
                             });
                             return Command::SUCCESS;
                         } else {
                             $results = $manager->checkMonitor();
                             $ss->section('Monitor Check Results');
-                            foreach ($results as $alias => $data) {
-                                $status = $data['reachable'] ? '✅ UP' : '❌ DOWN';
-                                $latency = $data['latency'] ?? 'N/A';
-                                $ss->writeln("{$alias} ({$data['host']}) : {$status}  Latency: {$latency}ms");
-                            }
+                            $ss->table(
+                                ['Alias', 'Host', 'Status', 'Latency'],
+                                array_map(static function ($alias, $data) {
+                                    return [
+                                        $alias,
+                                        $data['host'],
+                                        $data['reachable'] ? '<info>UP</info>' : '<error>DOWN</error>',
+                                        ($data['latency'] ?? 'N/A') . ' ms',
+                                    ];
+                                }, array_keys($results), array_values($results))
+                            );
                             return Command::SUCCESS;
                         }
                     });
@@ -310,7 +326,7 @@ class Network
                         if (empty($records)) {
                             $ss->warning("No records found for {$domain} of type {$typeStr}.");
                         } else {
-                            $ss->success("Found " . count($records) . " record(s):");
+                            $ss->section("DNS Records for {$domain}");
                             $rows = [];
                             foreach ($records as $rec) {
                                 if (isset($rec['ip'])) {
@@ -324,6 +340,7 @@ class Network
                                 }
                             }
                             $ss->table(['Domain', 'Type', 'Value'], $rows);
+                            $ss->success("Found " . count($records) . " record(s).");
                         }
                         return Command::SUCCESS;
                     });
