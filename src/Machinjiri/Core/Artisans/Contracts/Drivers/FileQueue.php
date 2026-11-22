@@ -68,9 +68,18 @@ class FileQueue extends BaseQueue
             'available_at' => time() + $delay,
             'attempts' => $job->getAttempts(),
         ];
-        
-        if (file_put_contents($filepath, json_encode($data)) === false) {
-            throw new DriverException('Failed to write job to file');
+
+        $lock = $this->acquireQueueLock();
+        if (!$lock) {
+            throw new DriverException('Failed to lock queue');
+        }
+
+        try {
+            if (!$this->atomicWriteJson($filepath, $data)) {
+                throw new DriverException('Failed to write job to file');
+            }
+        } finally {
+            $this->releaseQueueLock($lock);
         }
         
         $this->events->trigger('queue.job.pushed', [
@@ -88,42 +97,55 @@ class FileQueue extends BaseQueue
      */
     public function pop(string $queue = 'default'): ?JobInterface
     {
-        // Find next available job
-        $pattern = $this->storagePath . 'pending/' . $queue . '_*.json';
-        $files = glob($pattern);
-        
-        $now = time();
-        
-        foreach ($files as $filepath) {
-            $data = json_decode(file_get_contents($filepath), true);
-            
-            if (!$data) {
-                // Corrupted file, move to failed
-                $this->moveToFailed($filepath, 'Corrupted job file');
-                continue;
-            }
-            
-            // Check if job is available (not delayed)
-            if ($data['available_at'] > $now) {
-                continue;
-            }
-            
-            // Move to processing directory
-            $processingPath = $this->storagePath . 'processing/' . basename($filepath);
-            rename($filepath, $processingPath);
-            
-            // Create job instance
-            $jobClass = $data['job']['name'] ?? '';
-            
-            if (!class_exists($jobClass)) {
-                $this->moveToFailed($processingPath, 'Job class not found');
-                return null;
-            }
-            
-            return $jobClass::unserialize($data['job'], $this->app);
+        $lock = $this->acquireQueueLock();
+        if (!$lock) {
+            return null;
         }
-        
-        return null;
+
+        try {
+            $this->recoverStaleProcessingJobs($queue);
+
+            $pattern = $this->storagePath . 'pending/' . $queue . '_*.json';
+            $files = glob($pattern) ?: [];
+            $now = time();
+
+            foreach ($files as $filepath) {
+                $contents = file_get_contents($filepath);
+                $data = $contents === false ? null : json_decode($contents, true);
+
+                if (!is_array($data) || !isset($data['available_at']) || !is_numeric($data['available_at'])) {
+                    $this->moveToFailed($filepath, 'Corrupted job file');
+                    continue;
+                }
+
+                if ((int) $data['available_at'] > $now) {
+                    continue;
+                }
+
+                $processingPath = $this->storagePath . 'processing/' . basename($filepath);
+                if (!@rename($filepath, $processingPath)) {
+                    continue;
+                }
+
+                $data['reserved_at'] = $now;
+                if (!$this->atomicWriteJson($processingPath, $data)) {
+                    @rename($processingPath, $filepath);
+                    continue;
+                }
+
+                $jobClass = is_array($data['job'] ?? null) ? ($data['job']['name'] ?? '') : '';
+                if (!is_string($jobClass) || !class_exists($jobClass)) {
+                    $this->moveToFailed($processingPath, 'Job class not found');
+                    return null;
+                }
+
+                return $jobClass::unserialize($data['job'], $this->app);
+            }
+
+            return null;
+        } finally {
+            $this->releaseQueueLock($lock);
+        }
     }
 
     /**
@@ -131,33 +153,46 @@ class FileQueue extends BaseQueue
      */
     public function release(JobInterface $job, string $queue = 'default', int $delay = 0): bool
     {
-        // Find the job in processing directory
         $pattern = $this->storagePath . 'processing/*_' . $job->getId() . '.json';
-        $files = glob($pattern);
-        
-        if (empty($files)) {
+        $lock = $this->acquireQueueLock();
+        if (!$lock) {
             return false;
         }
-        
-        $filepath = $files[0];
-        $data = json_decode(file_get_contents($filepath), true);
-        
-        if (!$data) {
-            $this->moveToFailed($filepath, 'Corrupted job file on release');
-            return false;
+
+        try {
+            $files = glob($pattern) ?: [];
+            if (empty($files)) {
+                return false;
+            }
+
+            $filepath = $files[0];
+            $contents = file_get_contents($filepath);
+            $data = $contents === false ? null : json_decode($contents, true);
+
+            if (!is_array($data)) {
+                $this->moveToFailed($filepath, 'Corrupted job file on release');
+                return false;
+            }
+
+            $data['job'] = $job->serialize();
+            $data['available_at'] = time() + $delay;
+            $data['attempts'] = $job->getAttempts();
+            unset($data['reserved_at']);
+
+            $pendingPath = $this->storagePath . 'pending/' . basename($filepath);
+            if (!$this->atomicWriteJson($pendingPath, $data)) {
+                return false;
+            }
+
+            if (!unlink($filepath)) {
+                @unlink($pendingPath);
+                return false;
+            }
+
+            return true;
+        } finally {
+            $this->releaseQueueLock($lock);
         }
-        
-        // Update data
-        $data['job'] = $job->serialize();
-        $data['available_at'] = time() + $delay;
-        $data['attempts'] = $job->getAttempts();
-        
-        // Move back to pending
-        $pendingPath = $this->storagePath . 'pending/' . basename($filepath);
-        file_put_contents($pendingPath, json_encode($data));
-        unlink($filepath);
-        
-        return true;
     }
 
     /**
@@ -165,29 +200,38 @@ class FileQueue extends BaseQueue
      */
     public function delete(JobInterface $job, string $queue = 'default'): bool
     {
-        // Check in processing directory
-        $pattern = $this->storagePath . 'processing/*_' . $job->getId() . '.json';
-        $files = glob($pattern);
-        
-        if (!empty($files)) {
-            foreach ($files as $file) {
-                unlink($file);
-            }
-            return true;
+        $lock = $this->acquireQueueLock();
+        if (!$lock) {
+            return false;
         }
-        
-        // Check in pending directory
-        $pattern = $this->storagePath . 'pending/' . $queue . '_' . $job->getId() . '.json';
-        $files = glob($pattern);
-        
-        if (!empty($files)) {
-            foreach ($files as $file) {
-                unlink($file);
+
+        try {
+            $pattern = $this->storagePath . 'processing/*_' . $job->getId() . '.json';
+            $files = glob($pattern) ?: [];
+
+            if (!empty($files)) {
+                $deleted = false;
+                foreach ($files as $file) {
+                    $deleted = unlink($file) || $deleted;
+                }
+                return $deleted;
             }
-            return true;
+
+            $pattern = $this->storagePath . 'pending/' . $queue . '_' . $job->getId() . '.json';
+            $files = glob($pattern) ?: [];
+
+            if (!empty($files)) {
+                $deleted = false;
+                foreach ($files as $file) {
+                    $deleted = unlink($file) || $deleted;
+                }
+                return $deleted;
+            }
+
+            return false;
+        } finally {
+            $this->releaseQueueLock($lock);
         }
-        
-        return false;
     }
 
     /**
@@ -206,8 +250,9 @@ class FileQueue extends BaseQueue
         $now = time();
         
         foreach ($files as $file) {
-            $data = json_decode(file_get_contents($file), true);
-            if ($data && $data['available_at'] <= $now) {
+            $contents = file_get_contents($file);
+            $data = $contents === false ? null : json_decode($contents, true);
+            if (is_array($data) && isset($data['available_at']) && is_numeric($data['available_at']) && (int) $data['available_at'] <= $now) {
                 $count++;
             }
         }
@@ -221,30 +266,26 @@ class FileQueue extends BaseQueue
     public function clear(string $queue = 'default'): int
     {
         $count = 0;
+        $lock = $this->acquireQueueLock();
+        if (!$lock) {
+            return 0;
+        }
 
-        // Clear processing
-        $pattern = $this->storagePath . 'processing/' . $queue . '_*.json';
-        $files = glob($pattern);
-        
-        if ($files) {
-            foreach ($files as $file) {
-                unlink($file);
-                $count++;
+        try {
+            foreach (['processing', 'pending'] as $directory) {
+                $pattern = $this->storagePath . $directory . '/' . $queue . '_*.json';
+                $files = glob($pattern) ?: [];
+                foreach ($files as $file) {
+                    if (unlink($file)) {
+                        $count++;
+                    }
+                }
             }
+
+            return $count;
+        } finally {
+            $this->releaseQueueLock($lock);
         }
-        
-        // Clear pending
-        $pattern = $this->storagePath . 'pending/' . $queue . '_*.json';
-        $files = glob($pattern);
-        
-        if ($files) {
-            foreach ($files as $file) {
-                unlink($file);
-                $count++;
-            }
-        }
-        
-        return $count;
     }
 
     /**
@@ -253,19 +294,24 @@ class FileQueue extends BaseQueue
     public function clearFailed(string $queue = 'default'): int
     {
         $count = 0;
-
-        // Clear failed
-        $pattern = $this->storagePath . 'failed/' . $queue . '_*.json';
-        $files = glob($pattern);
-        
-        if ($files) {
-            foreach ($files as $file) {
-                unlink($file);
-                $count++;
-            }
+        $lock = $this->acquireQueueLock();
+        if (!$lock) {
+            return 0;
         }
-        
-        return $count;
+
+        try {
+            $pattern = $this->storagePath . 'failed/' . $queue . '_*.json';
+            $files = glob($pattern) ?: [];
+            foreach ($files as $file) {
+                if (unlink($file)) {
+                    $count++;
+                }
+            }
+
+            return $count;
+        } finally {
+            $this->releaseQueueLock($lock);
+        }
     }
 
     /**
@@ -303,19 +349,109 @@ class FileQueue extends BaseQueue
     {
         return $queue . '_' . $jobId . '.json';
     }
+
+    protected function acquireQueueLock()
+    {
+        $lock = @fopen($this->storagePath . '.queue.lock', 'c');
+        if ($lock === false) {
+            return null;
+        }
+
+        if (!flock($lock, LOCK_EX)) {
+            fclose($lock);
+            return null;
+        }
+
+        return $lock;
+    }
+
+    protected function releaseQueueLock($lock): void
+    {
+        flock($lock, LOCK_UN);
+        fclose($lock);
+    }
+
+    protected function atomicWriteJson(string $filepath, array $data): bool
+    {
+        $json = json_encode($data);
+        if ($json === false) {
+            return false;
+        }
+
+        $directory = dirname($filepath);
+        $tempPath = tempnam($directory, '.queue-');
+        if ($tempPath === false) {
+            return false;
+        }
+
+        if (file_put_contents($tempPath, $json, LOCK_EX) === false) {
+            @unlink($tempPath);
+            return false;
+        }
+
+        @chmod($tempPath, 0644);
+
+        if (!@rename($tempPath, $filepath)) {
+            @unlink($tempPath);
+            return false;
+        }
+
+        return true;
+    }
+
+    protected function recoverStaleProcessingJobs(string $queue): void
+    {
+        $retryAfter = (int) ($this->config['retry_after'] ?? 90);
+        if ($retryAfter < 0) {
+            return;
+        }
+
+        $pattern = $this->storagePath . 'processing/' . $queue . '_*.json';
+        $files = glob($pattern) ?: [];
+        $now = time();
+
+        foreach ($files as $filepath) {
+            $modifiedAt = filemtime($filepath);
+            if ($modifiedAt === false || $now - $modifiedAt < $retryAfter) {
+                continue;
+            }
+
+            $contents = file_get_contents($filepath);
+            $data = $contents === false ? null : json_decode($contents, true);
+
+            if (!is_array($data)) {
+                $this->moveToFailed($filepath, 'Corrupted processing job file');
+                continue;
+            }
+
+            $data['available_at'] = $now;
+            $data['released_at'] = $now;
+            $data['release_reason'] = 'Processing timeout';
+            unset($data['reserved_at']);
+
+            $pendingPath = $this->storagePath . 'pending/' . basename($filepath);
+            if ($this->atomicWriteJson($pendingPath, $data)) {
+                @unlink($filepath);
+            }
+        }
+    }
     
     protected function moveToFailed(string $filepath, string $error): void
     {
         $failedPath = $this->storagePath . 'failed/' . basename($filepath);
-        
-        $data = json_decode(file_get_contents($filepath), true);
-        if ($data) {
-            $data['failed_at'] = time();
-            $data['error'] = $error;
-            file_put_contents($failedPath, json_encode($data));
+
+        $contents = file_get_contents($filepath);
+        $data = $contents === false ? null : json_decode($contents, true);
+        if (!is_array($data)) {
+            $data = [];
         }
-        
-        unlink($filepath);
+
+        if ($this->atomicWriteJson($failedPath, array_merge($data, [
+            'failed_at' => time(),
+            'error' => $error,
+        ]))) {
+            @unlink($filepath);
+        }
     }
 
     /**
@@ -324,15 +460,16 @@ class FileQueue extends BaseQueue
     protected function moveToProcessed(string $filepath, array $payload = []): void
     {
         $processedPath = $this->storagePath . 'processed/' . basename($filepath);
-        
-        $data = json_decode(file_get_contents($filepath), true);
-        if ($data) {
+
+        $contents = file_get_contents($filepath);
+        $data = $contents === false ? null : json_decode($contents, true);
+        if (is_array($data)) {
             $data['processed_at'] = time();
             $data['result_payload'] = $payload; // optional result data
-            file_put_contents($processedPath, json_encode($data));
+            if ($this->atomicWriteJson($processedPath, $data)) {
+                @unlink($filepath);
+            }
         }
-        
-        unlink($filepath);
     }
 
     /**
@@ -376,31 +513,56 @@ class FileQueue extends BaseQueue
         if (empty($files)) {
             return false;
         }
-        
-        $filepath = $files[0];
-        $data = json_decode(file_get_contents($filepath), true);
-        
-        if (!$data || !isset($data['job'])) {
+
+        $lock = $this->acquireQueueLock();
+        if (!$lock) {
             return false;
         }
-        
-        // Create job instance
-        $jobClass = $data['job']['name'] ?? '';
-        
-        if (!class_exists($jobClass)) {
-            return false;
+
+        try {
+            $files = glob($pattern) ?: [];
+            if (empty($files)) {
+                return false;
+            }
+
+            $filepath = $files[0];
+            $contents = file_get_contents($filepath);
+            $data = $contents === false ? null : json_decode($contents, true);
+
+            if (!is_array($data) || !isset($data['job']) || !is_array($data['job'])) {
+                return false;
+            }
+
+            $jobClass = $data['job']['name'] ?? '';
+            if (!is_string($jobClass) || !class_exists($jobClass)) {
+                return false;
+            }
+
+            $job = $jobClass::unserialize($data['job'], $this->app);
+            $job->addMetadata('retried_at', date('Y-m-d H:i:s'));
+
+            $filename = $this->generateFilename($job->getId(), $queue);
+            $pendingData = [
+                'job' => $job->serialize(),
+                'queue' => $queue,
+                'created_at' => time(),
+                'available_at' => time(),
+                'attempts' => $job->getAttempts(),
+            ];
+
+            if (!$this->atomicWriteJson($this->storagePath . 'pending/' . $filename, $pendingData)) {
+                return false;
+            }
+
+            if (!unlink($filepath)) {
+                @unlink($this->storagePath . 'pending/' . $filename);
+                return false;
+            }
+
+            return true;
+        } finally {
+            $this->releaseQueueLock($lock);
         }
-        
-        $job = $jobClass::unserialize($data['job'], $this->app);
-        $job->addMetadata('retried_at', date('Y-m-d H:i:s'));
-        
-        // Push back to queue
-        $this->push($job, $queue, 0);
-        
-        // Remove from failed
-        unlink($filepath);
-        
-        return true;
     }
 
     /**
@@ -417,9 +579,10 @@ class FileQueue extends BaseQueue
         
         if ($files) {
             foreach ($files as $file) {
-                $data = json_decode(file_get_contents($file), true);
-                if ($data) {
-                    if ($data['available_at'] > $now) {
+                $contents = file_get_contents($file);
+                $data = $contents === false ? null : json_decode($contents, true);
+                if (is_array($data) && isset($data['available_at']) && is_numeric($data['available_at'])) {
+                    if ((int) $data['available_at'] > $now) {
                         $stats['delayed']++;
                     } else {
                         $stats['pending']++;
@@ -448,24 +611,30 @@ class FileQueue extends BaseQueue
     {
         $count = 0;
         $now = time();
-        
-        $directories = ['pending', 'processing', 'failed'];
-        
-        foreach ($directories as $dir) {
-            $pattern = $this->storagePath . $dir . '/*.json';
-            $files = glob($pattern);
-            
-            if ($files) {
+
+        $lock = $this->acquireQueueLock();
+        if (!$lock) {
+            return 0;
+        }
+
+        try {
+            foreach (['pending', 'processing', 'failed'] as $dir) {
+                $pattern = $this->storagePath . $dir . '/*.json';
+                $files = glob($pattern) ?: [];
                 foreach ($files as $file) {
-                    if ($now - filemtime($file) > $maxAge) {
-                        unlink($file);
-                        $count++;
+                    $modifiedAt = filemtime($file);
+                    if ($modifiedAt !== false && $now - $modifiedAt > $maxAge) {
+                        if (unlink($file)) {
+                            $count++;
+                        }
                     }
                 }
             }
+
+            return $count;
+        } finally {
+            $this->releaseQueueLock($lock);
         }
-        
-        return $count;
     }
 
     /**
@@ -474,14 +643,19 @@ class FileQueue extends BaseQueue
     public function markAsFailed(string $jobId, string $errorMessage): void 
     {
         $pattern = $this->storagePath . 'processing/*_' . $jobId . '.json';
-        
-        $files = glob($pattern);
-        
-        if (empty($files)) {
+        $lock = $this->acquireQueueLock();
+        if (!$lock) {
             return;
         }
-        
-        $this->moveToFailed($files[0], $errorMessage);
+
+        try {
+            $files = glob($pattern) ?: [];
+            if (!empty($files)) {
+                $this->moveToFailed($files[0], $errorMessage);
+            }
+        } finally {
+            $this->releaseQueueLock($lock);
+        }
     }
 
     /**
@@ -492,30 +666,36 @@ class FileQueue extends BaseQueue
      */
     public function markAsCompleted(string $jobId, array $payload = []): void
     {
-        // Look for the job in the processing directory
         $pattern = $this->storagePath . 'processing/*_' . $jobId . '.json';
-        $files = glob($pattern);
-        
-        if (empty($files)) {
-            // If not found in processing, it might still be pending (shouldn't happen, but handle gracefully)
-            $pattern = $this->storagePath . 'pending/*_' . $jobId . '.json';
-            $files = glob($pattern);
-            if (empty($files)) {
-                // Job not found; log or ignore
-                $this->events->trigger('queue.marked_completed.failed', [
-                    'job_id' => $jobId,
-                    'error' => 'Job file not found in processing or pending',
-                ]);
-                return;
-            }
+        $lock = $this->acquireQueueLock();
+        if (!$lock) {
+            return;
         }
-        
-        $filepath = $files[0];
-        $this->moveToProcessed($filepath, $payload);
-        
-        $this->events->trigger('queue.marked_completed', [
-            'job_id' => $jobId,
-            'payload' => $payload,
-        ]);
+
+        try {
+            $files = glob($pattern) ?: [];
+
+            if (empty($files)) {
+                $pattern = $this->storagePath . 'pending/*_' . $jobId . '.json';
+                $files = glob($pattern) ?: [];
+                if (empty($files)) {
+                    $this->events->trigger('queue.marked_completed.failed', [
+                        'job_id' => $jobId,
+                        'error' => 'Job file not found in processing or pending',
+                    ]);
+                    return;
+                }
+            }
+
+            $filepath = $files[0];
+            $this->moveToProcessed($filepath, $payload);
+
+            $this->events->trigger('queue.marked_completed', [
+                'job_id' => $jobId,
+                'payload' => $payload,
+            ]);
+        } finally {
+            $this->releaseQueueLock($lock);
+        }
     }
 }

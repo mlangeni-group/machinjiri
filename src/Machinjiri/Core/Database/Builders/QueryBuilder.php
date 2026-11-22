@@ -10,6 +10,7 @@ use Mlangeni\Machinjiri\Core\Exceptions\DatabaseException;
 class QueryBuilder {
     protected string $table;
     protected array $columns = ['*'];
+    protected bool $distinct = false;
     protected array $where = [];
     protected array $joins = [];
     protected array $orderBy = [];
@@ -59,7 +60,7 @@ class QueryBuilder {
 
     public function distinct(): self
     {
-        $this->columns[0] = 'DISTINCT ' . ($this->columns[0] === '*' ? '*' : implode(', ', $this->columns));
+        $this->distinct = true;
         return $this;
     }
 
@@ -253,7 +254,8 @@ class QueryBuilder {
       $wrappedTable = $this->grammar->wrapTable($this->table);
         $wrappedColumns = array_map([$this->grammar, 'wrapColumn'], $this->columns);
         
-        $sql = "SELECT " . implode(', ', $wrappedColumns) . " FROM {$wrappedTable}";
+        $distinct = $this->distinct ? 'DISTINCT ' : '';
+        $sql = "SELECT " . $distinct . implode(', ', $wrappedColumns) . " FROM {$wrappedTable}";
       
 
         // Compile joins
@@ -377,6 +379,7 @@ class QueryBuilder {
     protected function reset(): void
     {
         $this->columns = ['*'];
+        $this->distinct = false;
         $this->where = [];
         $this->joins = [];
         $this->orderBy = [];

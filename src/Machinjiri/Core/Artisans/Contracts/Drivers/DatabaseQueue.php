@@ -74,25 +74,77 @@ class DatabaseQueue extends BaseQueue
     public function pop(string $queue): ?JobInterface
     {
         $now = time();
-        $retryAfter = $this->config['retry_after'];
-        
-        // Find and reserve a job
-        $job = $this->queryBuilder
-            ->select()
-            ->where('queue', '=', $queue)
-            ->orderBy('created_at', 'ASC')
-            ->limit(1)
-            ->first();
-            
-        if (!$job || $job === null) {
-            return null;
+        $retryAfter = (int) $this->config['retry_after'];
+        $job = null;
+        $staleBefore = $now - $retryAfter;
+        $transactionStarted = false;
+
+        try {
+            DatabaseConnection::beginTransaction();
+            $transactionStarted = true;
+
+            $job = $this->queryBuilder
+                ->select()
+                ->where('queue', '=', $queue)
+                ->where('available_at', '<=', $now)
+                ->where('reserved_at', '=', 0)
+                ->orderBy('created_at', 'ASC')
+                ->limit(1)
+                ->first();
+
+            if (!$job && $retryAfter >= 0) {
+                $job = $this->queryBuilder
+                    ->select()
+                    ->where('queue', '=', $queue)
+                    ->where('available_at', '<=', $now)
+                    ->where('reserved_at', '>', 0)
+                    ->where('reserved_at', '<=', $staleBefore)
+                    ->orderBy('reserved_at', 'ASC')
+                    ->limit(1)
+                    ->first();
+            }
+
+            if (!$job) {
+                DatabaseConnection::commit();
+                $transactionStarted = false;
+                return null;
+            }
+
+            $reservation = $this->queryBuilder
+                ->update(['reserved_at' => $now])
+                ->where('job_id', '=', $job['job_id'])
+                ->where('queue', '=', $queue);
+
+            if (isset($job['reserved_at']) && (int) $job['reserved_at'] === 0) {
+                $reservation
+                    ->where('available_at', '<=', $now)
+                    ->where('reserved_at', '=', 0);
+            } else {
+                $reservation
+                    ->where('available_at', '<=', $now)
+                    ->where('reserved_at', '>', 0)
+                    ->where('reserved_at', '<=', $staleBefore);
+            }
+
+            $result = $reservation->execute();
+            if (($result['rowCount'] ?? 0) !== 1) {
+                DatabaseConnection::rollback();
+                $transactionStarted = false;
+                return null;
+            }
+
+            DatabaseConnection::commit();
+            $transactionStarted = false;
+        } catch (\Throwable $exception) {
+            if ($transactionStarted) {
+                try {
+                    DatabaseConnection::rollback();
+                } catch (\Throwable $rollbackException) {
+                    // Preserve the original reservation or database exception.
+                }
+            }
+            throw $exception;
         }
-        
-        // Mark as reserved
-        $this->queryBuilder
-            ->update(['reserved_at' => $now])
-            ->where('job_id', '=', $job['job_id'])
-            ->execute();
             
         // Unserialize job
         $jobData = json_decode($job['payload'], true);
@@ -118,17 +170,6 @@ class DatabaseQueue extends BaseQueue
     public function release(JobInterface $job, string $queue = 'default', int $delay = 0): bool
     {
         $serialized = json_encode($job->serialize());
-
-        // check if job is not already in queue 
-        $result = $this->queryBuilder
-            ->select()
-            ->where('job_id', '=', $job->getId())
-            ->where('queue', '=', $queue)
-            ->first();
-
-        if ($result !== null) {
-            return false;
-        }
         
         $result = $this->queryBuilder
             ->update([
@@ -202,7 +243,8 @@ class DatabaseQueue extends BaseQueue
     public function getQueues(): array
     {
         $result = $this->queryBuilder
-            ->select(['DISTINCT queue'])
+            ->select(['queue'])
+            ->distinct()
             ->execute();
             
         return array_column($result, 'queue');
@@ -217,7 +259,7 @@ class DatabaseQueue extends BaseQueue
             // Test database connection
             $this->queryBuilder->select(['1'])->first();
             return true;
-        } catch (DriverException $e) {
+        } catch (\Throwable $e) {
             return false;
         }
     }
@@ -302,32 +344,27 @@ class DatabaseQueue extends BaseQueue
             return;
         }
 
-        try {
-            // Move to failed jobs table
-            $failedQuery = new QueryBuilder($this->config['failed_table'] ?? 'failed_jobs');
+        // Move to failed jobs table
+        $failedQuery = new QueryBuilder($this->config['failed_table'] ?? 'failed_jobs');
 
-            // check if job already exists in failed
-            $exists = $failedQuery->select()->where('job_id', '=', $job['job_id'])->first();
+        // check if job already exists in failed
+        $exists = $failedQuery->select()->where('job_id', '=', $job['job_id'])->first();
 
-            if ($exists === null || !$exists) {
-                $result = $failedQuery->insert([
-                    'queue' => $job['queue'],
-                    'job_id' => $job['job_id'],
-                    'payload' => $job['payload'],
-                    'exception' => $error,
-                    'failed_at' => time(),
-                ])->execute();
-            }
-
-            // Remove from jobs table
-            $this->queryBuilder
-                ->delete()
-                ->where('job_id', '=', $jobId)
-                ->execute();
-            
-        } catch (\Throwable $exception) {
-            dd("Failed to mark job as failed: {$exception->getMessage()}");
+        if ($exists === null || !$exists) {
+            $failedQuery->insert([
+                'queue' => $job['queue'],
+                'job_id' => $job['job_id'],
+                'payload' => $job['payload'],
+                'exception' => $error,
+                'failed_at' => time(),
+            ])->execute();
         }
+
+        // Remove from jobs table even if a failure record already existed
+        $this->queryBuilder
+            ->delete()
+            ->where('job_id', '=', $jobId)
+            ->execute();
         
     }
 
@@ -347,26 +384,24 @@ class DatabaseQueue extends BaseQueue
         }
         
         // Move to processed jobs table
-        $provessedQuery = new QueryBuilder($this->config['processed_table'] ?? 'processed_jobs');
+        $processedQuery = new QueryBuilder($this->config['processed_table'] ?? 'processed_jobs');
 
         // check if job already exists in processed
-        $exists = $provessedQuery->select()->where('job_id', '=', $job['job_id'])->first();
+        $exists = $processedQuery->select()->where('job_id', '=', $job['job_id'])->first();
         if ($exists === null || !$exists) {
-            $result = $provessedQuery->insert([
+            $processedQuery->insert([
                 'queue' => $job['queue'],
                 'job_id' => $job['job_id'],
                 'payload' => json_encode($payload, true),
                 'processed_at' => time(),
             ])->execute();
-    
-            if ($result['lastInsertId'] || $result['lastInsertId'] > 0) {
-                // Remove from jobs table
-                $this->queryBuilder
-                    ->delete()
-                    ->where('job_id', '=', $jobId)
-                    ->execute();
-            }
         }
+
+        // Remove the source row regardless of whether it was already recorded
+        $this->queryBuilder
+            ->delete()
+            ->where('job_id', '=', $jobId)
+            ->execute();
         
     }
 

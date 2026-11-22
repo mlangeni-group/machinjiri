@@ -43,13 +43,12 @@ class BaseJobDispatcher implements JobDispatcherInterface
     public function dispatchToQueue(JobInterface $job, string $queue): string
     {
         // Validate queue name before using it
-        if (!$this->isValidQueueName($queue)) {
-            throw new QueueException("Invalid queue name: {$queue}", 60020);
-        }
+        $this->validateQueueName($queue);
+        $this->validateDelay($job->getDelay());
         
         $jobId = $this->queue->push($job, $queue, $job->getDelay());
         
-        $this->eventListener->trigger('job.dispatched - {queue}'. $queue, [
+        $this->eventListener->trigger('job.dispatched', [
             'job_id' => $jobId,
             'job_name' => $job->getName(),
             'queue' => $queue,
@@ -63,14 +62,44 @@ class BaseJobDispatcher implements JobDispatcherInterface
     {
         return preg_match('/^[a-zA-Z0-9_\-]+$/', $queue) === 1;
     }
+
+    private function validateQueueName(string $queue): void
+    {
+        if (!$this->isValidQueueName($queue)) {
+            throw new QueueException("Invalid queue name: {$queue}", 60020);
+        }
+    }
+
+    private function validateDelay(int $delay): void
+    {
+        if ($delay < 0) {
+            throw new JobException("Job delay cannot be negative: {$delay}", 60016);
+        }
+    }
     
     /**
      * Dispatch a job with a delay
      */
     public function dispatchWithDelay(JobInterface $job, int $delay): string
     {
-        $job->addMetadata('delay', $delay);
-        return $this->queue->push($job, $job->getQueue(), $delay);
+        $this->validateDelay($delay);
+        $queue = $job->getQueue();
+        $this->validateQueueName($queue);
+
+        if (method_exists($job, 'addMetadata')) {
+            $job->addMetadata('delay', $delay);
+        }
+
+        $jobId = $this->queue->push($job, $queue, $delay);
+
+        $this->eventListener->trigger('job.dispatched', [
+            'job_id' => $jobId,
+            'job_name' => $job->getName(),
+            'queue' => $queue,
+            'delay' => $delay,
+        ]);
+
+        return $jobId;
     }
     
     /**
@@ -115,13 +144,16 @@ class BaseJobDispatcher implements JobDispatcherInterface
         if (empty($jobs)) {
             throw new JobException('Cannot dispatch empty jobs array', 60014);
         }
-        
-        $jobIds = [];
-        
+
         foreach ($jobs as $job) {
             if (!($job instanceof JobInterface)) {
                 throw new JobException('All items must implement JobInterface', 60015);
             }
+        }
+        
+        $jobIds = [];
+        
+        foreach ($jobs as $job) {
             $jobIds[] = $this->dispatch($job);
         }
         
@@ -146,6 +178,7 @@ class BaseJobDispatcher implements JobDispatcherInterface
      */
     public function setDefaultQueue(string $queue): void
     {
+        $this->validateQueueName($queue);
         $this->defaultQueue = $queue;
     }
 }

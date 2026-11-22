@@ -4,7 +4,6 @@ namespace Mlangeni\Machinjiri\Core\Artisans\Contracts\Drivers;
 
 use Mlangeni\Machinjiri\Core\Artisans\Adapters\Redis\RedisAdapter;
 use Mlangeni\Machinjiri\Core\Artisans\Contracts\{BaseQueue, JobInterface};
-use Mlangeni\Machinjiri\Core\Exceptions\ContractsException\DriverException;
 
 /**
  * Redis Queue Driver (Predis based)
@@ -57,7 +56,7 @@ class RedisQueue extends BaseQueue
                     'timeout' => $this->config['timeout'],
                 ],
             ],
-            'prefix' => trim($this->prefix, ':'),
+            'prefix' => '',
             'serialize' => false,
         ]);
     }
@@ -105,12 +104,20 @@ class RedisQueue extends BaseQueue
     {
         // Check delayed queue for ready jobs
         $this->migrateDelayedJobs($queue);
+        $this->recoverTimedOutJobs($queue);
         
         $key = $this->getQueueKey($queue);
         $reservedKey = $this->getReservedQueueKey($queue);
         
-        // Move job from queue to reserved
-        $serialized = $this->redis->rpoplpush($key, $reservedKey);
+        // Atomically move the oldest job from the active queue to the reserved queue.
+        $serialized = $this->redis->eval(
+            "local job = redis.call('LPOP', KEYS[1]) " .
+            "if job then redis.call('RPUSH', KEYS[2], job) end " .
+            "return job",
+            2,
+            $key,
+            $reservedKey
+        );
         
         if (!$serialized) {
             return null;
@@ -135,11 +142,19 @@ class RedisQueue extends BaseQueue
         $jobId = $jobData['id'] ?? '';
         if ($jobId) {
             $timeoutKey = $this->getTimeoutKey($jobId);
-            $timeout = time() + ($this->config['retry_after'] ?? 90);
-            $this->redis->setex($timeoutKey, $this->config['retry_after'], '1');
+            $this->redis->setex($timeoutKey, (int) $this->config['retry_after'], '1');
         }
-        
-        return $jobClass::unserialize($jobData, $this->app);
+
+        try {
+            return $jobClass::unserialize($jobData, $this->app);
+        } catch (\Throwable $e) {
+            $this->redis->lrem($reservedKey, 1, $serialized);
+            if ($jobId) {
+                $this->redis->del($this->getTimeoutKey($jobId));
+            }
+            $this->moveToFailed($queue, $serialized, 'Job unserialization failed: ' . $e->getMessage());
+            return null;
+        }
     }
 
     /**
@@ -150,16 +165,69 @@ class RedisQueue extends BaseQueue
         $delayedKey = $this->getDelayedQueueKey($queue);
         $key = $this->getQueueKey($queue);
         $now = time();
-        
-        // Get jobs whose delay has expired
-        $jobs = $this->redis->zrangebyscore($delayedKey, 0, $now);
-        
-        if (!empty($jobs)) {
-            foreach ($jobs as $job) {
-                $this->redis->rpush($key, $job);
-                $this->redis->zrem($delayedKey, $job);
+
+        // The ZSET lookup and list/ZSET mutations must be atomic so concurrent
+        // workers cannot migrate the same delayed job more than once.
+        $this->redis->eval(
+            "local jobs = redis.call('ZRANGEBYSCORE', KEYS[1], 0, ARGV[1]) " .
+            "for _, job in ipairs(jobs) do " .
+            "redis.call('RPUSH', KEYS[2], job) " .
+            "redis.call('ZREM', KEYS[1], job) " .
+            "end " .
+            "return #jobs",
+            2,
+            $delayedKey,
+            $key,
+            $now
+        );
+    }
+
+    /**
+     * Move reservations back to the active queue after their timeout expires.
+     */
+    protected function recoverTimedOutJobs(string $queue): void
+    {
+        $reservedKey = $this->getReservedQueueKey($queue);
+        $activeKey = $this->getQueueKey($queue);
+        $jobs = $this->redis->lrange($reservedKey, 0, -1);
+
+        foreach ($jobs as $serialized) {
+            $jobData = json_decode($serialized, true);
+            $jobId = is_array($jobData) ? ($jobData['id'] ?? '') : '';
+
+            if (!$jobId) {
+                $this->redis->lrem($reservedKey, 1, $serialized);
+                $this->moveToFailed($queue, $serialized, 'Invalid reserved job');
+                continue;
+            }
+
+            $timeoutKey = $this->getTimeoutKey($jobId);
+            if (!$this->redis->exists($timeoutKey)) {
+                $removed = $this->redis->lrem($reservedKey, 1, $serialized);
+                if ($removed > 0) {
+                    $this->redis->rpush($activeKey, $serialized);
+                }
             }
         }
+    }
+
+    /**
+     * Remove all reserved entries for a job ID, rather than relying on a
+     * regenerated serialized payload being byte-for-byte identical.
+     */
+    protected function removeReservedJob(string $queue, string $jobId): bool
+    {
+        $reservedKey = $this->getReservedQueueKey($queue);
+        $removed = false;
+
+        foreach ($this->redis->lrange($reservedKey, 0, -1) as $serialized) {
+            $jobData = json_decode($serialized, true);
+            if (is_array($jobData) && ($jobData['id'] ?? '') === $jobId) {
+                $removed = $this->redis->lrem($reservedKey, 1, $serialized) > 0 || $removed;
+            }
+        }
+
+        return $removed;
     }
 
     /**
@@ -167,11 +235,10 @@ class RedisQueue extends BaseQueue
      */
     public function release(JobInterface $job, string $queue = 'default', int $delay = 0): bool
     {
-        $reservedKey = $this->getReservedQueueKey($queue);
-        $serialized = json_encode($job->serialize());
-        
-        // Remove from reserved
-        $this->redis->lrem($reservedKey, 1, $serialized);
+        $removed = $this->removeReservedJob($queue, $job->getId());
+        if (!$removed) {
+            return false;
+        }
         
         // Clear timeout
         $timeoutKey = $this->getTimeoutKey($job->getId());
@@ -186,11 +253,7 @@ class RedisQueue extends BaseQueue
      */
     public function delete(JobInterface $job, string $queue = 'default'): bool
     {
-        $reservedKey = $this->getReservedQueueKey($queue);
-        $serialized = json_encode($job->serialize());
-        
-        // Remove from reserved
-        $removed = $this->redis->lrem($reservedKey, 1, $serialized);
+        $removed = $this->removeReservedJob($queue, $job->getId());
         
         // Clear timeout and metadata
         $timeoutKey = $this->getTimeoutKey($job->getId());
@@ -199,7 +262,7 @@ class RedisQueue extends BaseQueue
         $metaKey = $this->getJobMetaKey($job->getId());
         $this->redis->del($metaKey);
         
-        return $removed > 0;
+        return $removed;
     }
 
     /**
@@ -243,9 +306,11 @@ class RedisQueue extends BaseQueue
         
         $queues = [];
         foreach ($keys as $key) {
-            $parts = explode(':', $key);
-            if (isset($parts[1])) {
-                $queues[] = $parts[1];
+            if (str_starts_with($key, $this->prefix) && str_ends_with($key, ':queue')) {
+                $queue = substr($key, strlen($this->prefix), -strlen(':queue'));
+                if ($queue !== '') {
+                    $queues[] = $queue;
+                }
             }
         }
         
@@ -258,8 +323,8 @@ class RedisQueue extends BaseQueue
     public function isHealthy(): bool
     {
         try {
-            return $this->redis->ping() === 'PONG';
-        } catch (DriverException $e) {
+            return $this->redis->ping();
+        } catch (\Throwable $e) {
             return false;
         }
     }
