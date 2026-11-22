@@ -2,7 +2,7 @@
 
 namespace Mlangeni\Machinjiri\Core\Http;
 
-use Mlangeni\Machinjiri\Core\Exceptions\MachinjiriException;
+use Mlangeni\Machinjiri\Core\Exceptions\HttpException;
 use Mlangeni\Machinjiri\Core\Exceptions\HttpTransportException;
 use Mlangeni\Machinjiri\Core\Exceptions\HttpTimeoutException;
 use Mlangeni\Machinjiri\Core\Exceptions\HttpStatusException;
@@ -106,7 +106,7 @@ class HttpClient
     {
         $this->ch = curl_init();
         if ($this->ch === false) {
-            throw new MachinjiriException('Failed to initialize cURL handle');
+            throw new HttpException('Failed to initialize cURL handle');
         }
         $this->setDefaultOptions();
         $this->withHeaderCapture();
@@ -116,7 +116,9 @@ class HttpClient
     {
         $this->options = [
             CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_FOLLOWLOCATION => true,
+            // Redirects are handled explicitly below so credentials and
+            // cookies can be removed before a cross-origin redirect.
+            CURLOPT_FOLLOWLOCATION => false,
             CURLOPT_MAXREDIRS      => $this->maxRedirects,
             CURLOPT_TIMEOUT        => $this->timeout,
             // Prefer HTTP/2 over TLS, fall back to 1.1 automatically.
@@ -169,6 +171,9 @@ class HttpClient
 
     public function close(): void
     {
+        if (is_resource($this->ch)) {
+            curl_close($this->ch);
+        }
         $this->ch = null;
     }
 
@@ -541,27 +546,88 @@ class HttpClient
             };
             $usingBuffer = true;
         }
-
-        curl_setopt_array($this->ch, $opts);
-
-        $raw         = curl_exec($this->ch);
-        $error       = curl_error($this->ch);
-        $errno       = curl_errno($this->ch);
-        $httpCode    = (int) curl_getinfo($this->ch, CURLINFO_HTTP_CODE);
-        $contentType = curl_getinfo($this->ch, CURLINFO_CONTENT_TYPE);
-        $totalTime   = curl_getinfo($this->ch, CURLINFO_TOTAL_TIME);
-
-        if ($usingBuffer && $raw === true) {
-            $raw = $this->responseBuffer;
+        if ($this->maxResponseBytes !== null && isset($opts[CURLOPT_FILE])) {
+            $downloadBytes = 0;
+            $file = $opts[CURLOPT_FILE];
+            $opts[CURLOPT_WRITEFUNCTION] = function ($ch, string $chunk) use ($file, &$downloadBytes): int {
+                $downloadBytes += strlen($chunk);
+                if ($downloadBytes > $this->maxResponseBytes) {
+                    return 0;
+                }
+                $written = fwrite($file, $chunk);
+                return $written === false ? 0 : $written;
+            };
         }
 
+        $redirectCount = 0;
+        $currentUrl = (string) ($opts[CURLOPT_URL] ?? '');
+        $opts[CURLOPT_FOLLOWLOCATION] = false;
+
+        do {
+            curl_setopt_array($this->ch, $opts);
+            $raw         = curl_exec($this->ch);
+            $error       = curl_error($this->ch);
+            $errno       = curl_errno($this->ch);
+            $httpCode    = (int) curl_getinfo($this->ch, CURLINFO_HTTP_CODE);
+            $contentType = curl_getinfo($this->ch, CURLINFO_CONTENT_TYPE);
+            $totalTime   = curl_getinfo($this->ch, CURLINFO_TOTAL_TIME);
+
+            if ($usingBuffer && $raw === true) {
+                $raw = $this->responseBuffer;
+            }
+
+            if ($httpCode >= 300 && $httpCode < 400) {
+                $location = $this->getResponseHeader('Location');
+                if ($location !== null && $redirectCount < $this->maxRedirects) {
+                    $nextUrl = $this->resolveRedirectUrl($currentUrl, $location);
+                    if ($nextUrl !== null) {
+                        $this->prepareRedirect($currentUrl, $nextUrl, $httpCode);
+                        $opts = $this->options;
+                        $opts[CURLOPT_URL] = $nextUrl;
+                        $opts[CURLOPT_FOLLOWLOCATION] = false;
+                        if ($this->maxResponseBytes !== null && !isset($opts[CURLOPT_FILE])) {
+                            $opts[CURLOPT_RETURNTRANSFER] = false;
+                            $opts[CURLOPT_WRITEFUNCTION] = function ($ch, string $chunk): int {
+                                $this->responseBuffer .= $chunk;
+                                if ($this->maxResponseBytes !== null
+                                    && strlen($this->responseBuffer) > $this->maxResponseBytes) {
+                                    return 0;
+                                }
+                                return strlen($chunk);
+                            };
+                            $usingBuffer = true;
+                        } elseif ($this->maxResponseBytes !== null && isset($opts[CURLOPT_FILE])) {
+                            $downloadBytes = 0;
+                            $file = $opts[CURLOPT_FILE];
+                            $opts[CURLOPT_WRITEFUNCTION] = function ($ch, string $chunk) use ($file, &$downloadBytes): int {
+                                $downloadBytes += strlen($chunk);
+                                if ($downloadBytes > $this->maxResponseBytes) {
+                                    return 0;
+                                }
+                                $written = fwrite($file, $chunk);
+                                return $written === false ? 0 : $written;
+                            };
+                        }
+                        $redirectCount++;
+                        $currentUrl = $nextUrl;
+                        $this->responseHeaders = [];
+                        $this->responseBuffer = '';
+                        continue;
+                    }
+                }
+            }
+            break;
+        } while (true);
+
         $retryable = $this->isRetryable($httpCode, $errno);
+        $retryBudgetExhausted = false;
 
         if ($retryable && $this->retryCount < $this->maxRetries) {
             $delayMs = $this->computeRetryDelayMs($httpCode);
             $nextAttemptCost = $delayMs * 1_000_000; // ns
 
             if (hrtime(true) + $nextAttemptCost > $deadlineNs) {
+                $retryBudgetExhausted = true;
                 $this->log('warning', 'Retry budget exhausted', [
                     'attempt'   => $this->retryCount,
                     'status'    => $httpCode,
@@ -584,8 +650,10 @@ class HttpClient
             }
         }
 
-        if ($errno !== 0 && $this->retryCount >= $this->maxRetries) {
-            $msg = "cURL error after {$this->maxRetries} retries: {$error} ({$errno})";
+        if ($errno !== 0 && ($retryBudgetExhausted || $this->retryCount >= $this->maxRetries)) {
+            $msg = $retryBudgetExhausted
+                ? "cURL error after retry budget exhausted: {$error} ({$errno})"
+                : "cURL error after {$this->maxRetries} retries: {$error} ({$errno})";
             if ($errno === CURLE_OPERATION_TIMEOUTED) {
                 throw new HttpTimeoutException($msg);
             }
@@ -602,6 +670,97 @@ class HttpClient
             'retry_count'  => $this->retryCount,
             'headers'      => $this->responseHeaders,
         ];
+    }
+
+    private function resolveRedirectUrl(string $currentUrl, string $location): ?string
+    {
+        $location = trim($location);
+        if ($location === '') {
+            return null;
+        }
+
+        $locationParts = parse_url($location);
+        if ($locationParts === false) {
+            return null;
+        }
+        if (isset($locationParts['scheme']) && isset($locationParts['host'])) {
+            return $location;
+        }
+
+        $base = parse_url($currentUrl);
+        if ($base === false || !isset($base['scheme'], $base['host'])) {
+            return null;
+        }
+
+        $authority = $base['scheme'] . '://' . $base['host'];
+        if (isset($base['port'])) {
+            $authority .= ':' . $base['port'];
+        }
+
+        if (str_starts_with($location, '//')) {
+            return $base['scheme'] . ':' . $location;
+        }
+        if (str_starts_with($location, '/')) {
+            return $authority . $location;
+        }
+
+        $path = $base['path'] ?? '/';
+        $slash = strrpos($path, '/');
+        $directory = $slash === false ? '/' : substr($path, 0, $slash + 1);
+        return $authority . $directory . $location;
+    }
+
+    private function prepareRedirect(string $currentUrl, string $nextUrl, int $httpCode): void
+    {
+        if (!$this->isSameOrigin($currentUrl, $nextUrl)) {
+            $headers = $this->options[CURLOPT_HTTPHEADER] ?? [];
+            $headers = array_values(array_filter($headers, static function ($header): bool {
+                if (!is_string($header)) {
+                    return true;
+                }
+                $name = strtolower(trim(explode(':', $header, 2)[0]));
+                return !in_array($name, ['authorization', 'cookie', 'proxy-authorization'], true);
+            }));
+            $this->options[CURLOPT_HTTPHEADER] = $headers;
+            unset($this->options[CURLOPT_HTTPAUTH], $this->options[CURLOPT_USERPWD]);
+            $this->options[CURLOPT_COOKIE] = '';
+
+            $next = parse_url($nextUrl);
+            if (($next['scheme'] ?? '') === 'https') {
+                $this->options[CURLOPT_SSL_VERIFYPEER] = true;
+                $this->options[CURLOPT_SSL_VERIFYHOST] = 2;
+            }
+        }
+
+        if (in_array($httpCode, [301, 302, 303], true)
+            && in_array($this->currentMethod, ['POST', 'PATCH', 'DELETE'], true)) {
+            $this->currentMethod = 'GET';
+            unset(
+                $this->options[CURLOPT_POST],
+                $this->options[CURLOPT_POSTFIELDS],
+                $this->options[CURLOPT_CUSTOMREQUEST]
+            );
+            $this->options[CURLOPT_HTTPGET] = true;
+        }
+    }
+
+    private function isSameOrigin(string $firstUrl, string $secondUrl): bool
+    {
+        $first = parse_url($firstUrl);
+        $second = parse_url($secondUrl);
+        if ($first === false || $second === false) {
+            return false;
+        }
+
+        $scheme = strtolower((string) ($first['scheme'] ?? ''));
+        $host = strtolower((string) ($first['host'] ?? ''));
+        $port = $first['port'] ?? ($scheme === 'https' ? 443 : ($scheme === 'http' ? 80 : null));
+
+        $nextScheme = strtolower((string) ($second['scheme'] ?? ''));
+        $nextHost = strtolower((string) ($second['host'] ?? ''));
+        $nextPort = $second['port'] ?? ($nextScheme === 'https' ? 443 : ($nextScheme === 'http' ? 80 : null));
+
+        return $scheme === $nextScheme && $host === $nextHost && $port === $nextPort;
     }
 
     /**
@@ -661,17 +820,30 @@ class HttpClient
      |  Request shortcuts
      * ================================================================== */
 
+    private function clearMethodOptions(): void
+    {
+        unset(
+            $this->options[CURLOPT_HTTPGET],
+            $this->options[CURLOPT_POST],
+            $this->options[CURLOPT_NOBODY],
+            $this->options[CURLOPT_POSTFIELDS],
+            $this->options[CURLOPT_CUSTOMREQUEST],
+            $this->options[CURLOPT_FILE]
+        );
+    }
+
     public function get($endpoint = '', $queryParams = []): array
     {
+        $this->clearMethodOptions();
         $this->currentMethod = 'GET';
         $this->options[CURLOPT_URL] = $this->buildUrl($endpoint, $queryParams);
         $this->options[CURLOPT_HTTPGET] = true;
-        unset($this->options[CURLOPT_CUSTOMREQUEST], $this->options[CURLOPT_POSTFIELDS]);
         return $this->execute();
     }
 
     public function post($endpoint = '', $data = [], bool $isJson = true): array
     {
+        $this->clearMethodOptions();
         $this->currentMethod = 'POST';
         $this->options[CURLOPT_URL]           = $this->buildUrl($endpoint);
         $this->options[CURLOPT_CUSTOMREQUEST] = 'POST';
@@ -682,6 +854,7 @@ class HttpClient
 
     public function put($endpoint = '', $data = [], bool $isJson = true): array
     {
+        $this->clearMethodOptions();
         $this->currentMethod = 'PUT';
         $this->options[CURLOPT_URL]           = $this->buildUrl($endpoint);
         $this->options[CURLOPT_CUSTOMREQUEST] = 'PUT';
@@ -691,6 +864,7 @@ class HttpClient
 
     public function patch($endpoint = '', $data = [], bool $isJson = true): array
     {
+        $this->clearMethodOptions();
         $this->currentMethod = 'PATCH';
         $this->options[CURLOPT_URL]           = $this->buildUrl($endpoint);
         $this->options[CURLOPT_CUSTOMREQUEST] = 'PATCH';
@@ -700,6 +874,7 @@ class HttpClient
 
     public function delete($endpoint = '', $data = []): array
     {
+        $this->clearMethodOptions();
         $this->currentMethod = 'DELETE';
         $this->options[CURLOPT_URL]           = $this->buildUrl($endpoint);
         $this->options[CURLOPT_CUSTOMREQUEST] = 'DELETE';
@@ -712,15 +887,16 @@ class HttpClient
 
     public function head($endpoint = ''): array
     {
+        $this->clearMethodOptions();
         $this->currentMethod = 'HEAD';
         $this->options[CURLOPT_URL]    = $this->buildUrl($endpoint);
         $this->options[CURLOPT_NOBODY] = true;
-        unset($this->options[CURLOPT_CUSTOMREQUEST]);
         return $this->execute();
     }
 
     public function options($endpoint = ''): array
     {
+        $this->clearMethodOptions();
         $this->currentMethod = 'OPTIONS';
         $this->options[CURLOPT_URL]           = $this->buildUrl($endpoint);
         $this->options[CURLOPT_CUSTOMREQUEST] = 'OPTIONS';
@@ -747,9 +923,10 @@ class HttpClient
     public function uploadFile(string $endpoint, string $fieldName, string $filePath, array $additionalData = []): array
     {
         if (!is_file($filePath) || !is_readable($filePath)) {
-            throw new MachinjiriException("File not found or not readable: {$filePath}");
+            throw new HttpException("File not found or not readable: {$filePath}");
         }
 
+        $this->clearMethodOptions();
         $this->currentMethod = 'POST';
         $this->options[CURLOPT_URL]           = $this->buildUrl($endpoint);
         $this->options[CURLOPT_CUSTOMREQUEST] = 'POST';
@@ -771,15 +948,16 @@ class HttpClient
     {
         $dir = dirname($savePath);
         if (!is_dir($dir) || !is_writable($dir)) {
-            throw new MachinjiriException("Directory not writable: {$dir}");
+            throw new HttpException("Directory not writable: {$dir}");
         }
 
         $tmp = $savePath . '.part-' . bin2hex(random_bytes(4));
         $fh  = fopen($tmp, 'w+b');
         if ($fh === false) {
-            throw new MachinjiriException("Cannot open file for writing: {$tmp}");
+            throw new HttpException("Cannot open file for writing: {$tmp}");
         }
 
+        $this->clearMethodOptions();
         $this->currentMethod = 'GET';
 
         $saved = $this->options;
@@ -791,7 +969,7 @@ class HttpClient
             $result = $this->execute();
 
             if (!fclose($fh)) {
-                throw new MachinjiriException("Failed to flush {$tmp}");
+                throw new HttpException("Failed to flush {$tmp}");
             }
             $fh = null;
 
@@ -806,7 +984,7 @@ class HttpClient
 
             if (!rename($tmp, $savePath)) {
                 @unlink($tmp);
-                throw new MachinjiriException("Cannot rename {$tmp} to {$savePath}");
+                throw new HttpException("Cannot rename {$tmp} to {$savePath}");
             }
 
             return $result;
@@ -832,9 +1010,10 @@ class HttpClient
     {
         $tmp = fopen('php://temp', 'w+b');
         if ($tmp === false) {
-            throw new MachinjiriException('Cannot open php://temp stream');
+            throw new HttpException('Cannot open php://temp stream');
         }
 
+        $this->clearMethodOptions();
         $this->currentMethod = strtoupper($method);
 
         $saved = $this->options;
@@ -953,8 +1132,13 @@ class HttpClient
 
     public function getResponseHeader(string $name): ?string
     {
-        $v = $this->responseHeaders[$name] ?? null;
-        return is_array($v) ? ($v[0] ?? null) : $v;
+        $wanted = strtolower($name);
+        foreach ($this->responseHeaders as $headerName => $v) {
+            if (strtolower((string) $headerName) === $wanted) {
+                return is_array($v) ? ($v[0] ?? null) : (string) $v;
+            }
+        }
+        return null;
     }
 
     /* ==================================================================
