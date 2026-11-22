@@ -25,6 +25,7 @@ class QueryBuilder {
     protected array $createOptions = [];
     protected string $alterTable = '';
     protected array $alterActions = [];
+    protected string|int|null $shardKey = null;
 
     protected Grammar $grammar;
 
@@ -37,6 +38,15 @@ class QueryBuilder {
     public static function builder(string $table): self 
     {
         return new self($table);
+    }
+
+    /**
+     * Route this query to the shard selected by the given key.
+     */
+    public function onShard(string|int $shardKey): self
+    {
+        $this->shardKey = $shardKey;
+        return $this;
     }
 
     // SELECT operations
@@ -207,7 +217,7 @@ class QueryBuilder {
         }
 
         try {
-            $stmt = DatabaseConnection::executeQuery($sql, $this->bindings);
+            $stmt = DatabaseConnection::executeQuery($sql, $this->bindings, $this->shardKey);
             
             if ($this->action === 'select') {
                 return $stmt->fetchAll();
@@ -215,7 +225,7 @@ class QueryBuilder {
             
             return [
                 'rowCount' => $stmt->rowCount(),
-                'lastInsertId' => DatabaseConnection::getInstance()->lastInsertId()
+                'lastInsertId' => DatabaseConnection::getInstance($this->shardKey)->lastInsertId()
             ];
         } finally {
             $this->reset();
@@ -382,6 +392,7 @@ class QueryBuilder {
         $this->createOptions = [];
         $this->alterTable = '';
         $this->alterActions = [];
+        $this->shardKey = null;
     }
     
     public function count(string $column = '*', bool $distinct = false): int
