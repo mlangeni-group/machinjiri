@@ -222,7 +222,7 @@ class HttpResponse
     public function redirect(string $url, int $statusCode = 302): self
     {
         if ($statusCode < 300 || $statusCode >= 400) {
-            throw new HttpStatusException($code, "Invalid redirect status code");
+            throw new HttpStatusException($statusCode, "Invalid redirect status code");
         }
         $this->validateHeaderValue('Location', $url);
         $this->setStatusCode($statusCode);

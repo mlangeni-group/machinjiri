@@ -97,10 +97,9 @@ abstract class AbstractController
      */
     protected function json($data, int $statusCode = 200): HttpResponse
     {
-        $response = new HttpResponse();
-        $response->setStatusCode($statusCode)
-                 ->setJsonBody($data);
-        return $response;
+        return $this->response
+            ->setStatusCode($statusCode)
+            ->setJsonBody($data);
     }
 
     /**
@@ -110,13 +109,12 @@ abstract class AbstractController
      * @param int    $statusCode
      * @return HttpResponse
      */
-    protected function redirect(string $url, int $statusCode = 302): void
+    protected function redirect(string $url, int $statusCode = 302): HttpResponse
     {
-        $response = new HttpResponse();
-        $response->setStatusCode($statusCode)
-                 ->setHeader('Location', $url)
-                 ->send();
-        return;
+        $this->response
+            ->redirect($url, $statusCode)
+            ->send();
+        return $this->response;
     }
 
     /**
@@ -127,7 +125,7 @@ abstract class AbstractController
      */
     protected function back(int $statusCode = 302): HttpResponse
     {
-        $referer = $this->request->getReferer() ?: '/';
+        $referer = $this->safeReferer();
         return $this->redirect($referer, $statusCode);
     }
 
@@ -280,7 +278,7 @@ abstract class AbstractController
     protected function csrfField(): string
     {
         $token = $this->csrfToken->getToken();
-        return '<input type="hidden" name="_token" value="' . htmlspecialchars($token) . '">';
+        return '<input type="hidden" name="_token" value="' . htmlspecialchars($token, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '">';
     }
 
     /**
@@ -292,6 +290,40 @@ abstract class AbstractController
     {
         $token = $this->request->input('_token') ?? $this->request->getHeader('X-CSRF-TOKEN');
         return $this->csrfToken->validateToken((string) $token);
+    }
+
+    /**
+     * Accept only same-origin or root-relative return URLs.
+     */
+    private function safeReferer(): string
+    {
+        $referer = trim($this->request->getReferer());
+        if ($referer === '') {
+            return '/';
+        }
+
+        if (str_starts_with($referer, '/') && !str_starts_with($referer, '//')) {
+            return $referer;
+        }
+
+        $parts = parse_url($referer);
+        if (!is_array($parts) || !isset($parts['host'])) {
+            return '/';
+        }
+
+        $expectedHost = (string) ($this->request->getServerParam('HTTP_HOST')
+            ?? $this->request->getServerParam('SERVER_NAME')
+            ?? '');
+        $expectedHost = strtolower(preg_replace('/:\d+$/', '', $expectedHost) ?? $expectedHost);
+        $actualHost = strtolower(preg_replace('/:\d+$/', '', $parts['host']) ?? $parts['host']);
+
+        if ($expectedHost === '' || $actualHost !== $expectedHost) {
+            return '/';
+        }
+
+        $path = $parts['path'] ?? '/';
+        $query = isset($parts['query']) ? '?' . $parts['query'] : '';
+        return $path . $query;
     }
 
     // -------------------------------------------------------------------------
@@ -324,12 +356,12 @@ abstract class AbstractController
             // For AJAX requests, send JSON error response
             if ($this->request->isAjax() || $this->request->expectsJson()) {
                 $formRequest->respondWithErrors()->send();
-                exit;
+                return [];
             }
 
             // Otherwise redirect back with errors and old input
             $formRequest->redirectBack()->send();
-            exit;
+            return [];
         }
 
         return $formRequest->validated();
@@ -376,11 +408,11 @@ abstract class AbstractController
                 $this->response->setStatusCode(422)
                                ->setJsonBody(['errors' => $errors])
                                ->send();
-                exit;
+                return [];
             }
 
-            $this->back()->send();
-            exit;
+            $this->back();
+            return [];
         }
 
         return $validator->getValidatedData();
