@@ -34,6 +34,7 @@ use Mlangeni\Machinjiri\Core\Security\Hashing\Hasher;
 use Mlangeni\Machinjiri\Core\Security\Tokens\{CSRFToken, CookieOptions};
 use Mlangeni\Machinjiri\Core\Transport\Mail\MailManager;
 use Mlangeni\Machinjiri\Core\Transport\Mail\MailTemplateRenderer;
+use Mlangeni\Machinjiri\Core\Transport\Chat\ChatManager;
 use Mlangeni\Machinjiri\Core\Transport\SMS\SMSManager;
 
 class AppServiceProvider extends ServiceProvider
@@ -119,6 +120,7 @@ class AppServiceProvider extends ServiceProvider
                 $this->mergeConfigFrom($configDir . 'database.php', 'database');
                 $this->mergeConfigFrom($configDir . 'cache.php', 'cache');
                 $this->mergeConfigFrom($configDir . 'mail.php', 'mail');
+                $this->mergeConfigFrom($configDir . 'chat.php', 'chat');
                 $this->mergeConfigFrom($configDir . 'queue.php', 'queue');
                 $this->mergeConfigFrom($configDir . 'auth.php', 'auth');
                 $this->mergeConfigFrom($configDir . 'oauth.php', 'oauth');
@@ -332,6 +334,7 @@ class AppServiceProvider extends ServiceProvider
             'fs.manager'                    => FileSystemManager::class,
             'cache.manager'                 => CacheManager::class,
             'mail.manager'                  => MailManager::class,
+            'chat.manager'                  => ChatManager::class,
             'sms.manager'                   => SMSManager::class,
             'logger'                        => Logger::class,
             'routing.config'                => RoutingConfig::class,
@@ -368,6 +371,10 @@ class AppServiceProvider extends ServiceProvider
         // -------------------- SMS Transport --------------------
         $this->app->singleton(SMSManager::class, function ($app) {
             return SMSManager::fromConfig($app->configurations['sms'] ?? [], $app);
+        });
+
+        $this->app->singleton(ChatManager::class, function ($app) {
+            return ChatManager::fromConfig($app->configurations['chat'] ?? []);
         });
         
     }
