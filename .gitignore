@@ -1,2 +1,5 @@
 /vendor/
-/tests/
+/tests/*
+!/tests/Unit/
+/tests/Unit/*
+!/tests/Unit/ChatTransportTest.php
