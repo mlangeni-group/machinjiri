@@ -229,6 +229,12 @@ class OneDrive extends CloudAdapter
             ]),
         ]);
         $this->assertOk($res, "Move failed {$source} -> {$destination}");
+        if (isset($this->idCache[$source])) {
+            $this->idCache[$destination] = $this->idCache[$source];
+            unset($this->idCache[$source]);
+        }
+        $this->cacheForget("onedrive:meta:{$source}");
+        $this->cacheForget("onedrive:meta:{$destination}");
         return true;
     }
 

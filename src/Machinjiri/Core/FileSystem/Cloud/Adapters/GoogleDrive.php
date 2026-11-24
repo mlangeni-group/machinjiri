@@ -107,14 +107,19 @@ class GoogleDrive extends CloudAdapter
         }
 
         // 2) Stream chunks.
-        $meta     = stream_get_meta_data($resource);
-        $seekable = $meta['seekable'] ?? false;
         $offset   = 0;
+        $uploadedId = null;
 
         while (!feof($resource)) {
             $chunk = fread($resource, self::CHUNK_SIZE);
-            if ($chunk === false || $chunk === '') {
-                break;
+            if ($chunk === false) {
+                $this->fail("Unable to read upload stream for {$path}");
+            }
+            if ($chunk === '') {
+                if (feof($resource)) {
+                    break;
+                }
+                $this->fail("Upload stream stopped before EOF for {$path}");
             }
             $len = strlen($chunk);
 
@@ -126,13 +131,22 @@ class GoogleDrive extends CloudAdapter
                 'body' => $chunk,
             ]);
 
-            if ($put->status() !== 308 && !$put->ok()) {
-                $this->assertOk($put, "Chunk upload failed at offset {$offset}");
+            if ($put->status() === 308) {
+                $offset += $len;
+                continue;
             }
-            $offset += $len;
+
+            $this->assertOk($put, "Chunk upload failed at offset {$offset}");
+            $uploadedId = $put->json()['id'] ?? null;
+            break;
         }
 
-        $this->idCache[$path] = $this->idCache[$path] ?? '';
+        if (!is_string($uploadedId) || $uploadedId === '') {
+            $this->fail("Google Drive did not complete the upload for {$path}");
+        }
+
+        $this->idCache[$path] = $uploadedId;
+        $this->cacheForget("gdrive:meta:{$path}");
     }
 
     protected function removePath(string $path): bool
@@ -163,6 +177,10 @@ class GoogleDrive extends CloudAdapter
             'body'    => json_encode(['name' => $newName]),
         ]);
         $this->assertOk($res, "Move failed {$source} -> {$destination}");
+        $this->idCache[$destination] = $srcId;
+        unset($this->idCache[$source]);
+        $this->cacheForget("gdrive:meta:{$source}");
+        $this->cacheForget("gdrive:meta:{$destination}");
         return true;
     }
 

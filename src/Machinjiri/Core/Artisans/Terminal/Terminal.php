@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Mlangeni\Machinjiri\Core\Artisans\Terminal;
 
 use Symfony\Component\Console\Application;
+use Mlangeni\Machinjiri\Core\Database\Utility\DatabaseBackupCommands;
 use Mlangeni\Machinjiri\Core\Artisans\Terminal\Commands\{
     App,
     DatabaseCommands,
@@ -33,6 +34,7 @@ class Terminal extends Application
         WebhookCommand::class,
         Network::class,
         DatabaseCommands::class,
+        DatabaseBackupCommands::class,
         NotificationCommand::class,
     ];
 
