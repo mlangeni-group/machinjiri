@@ -3,7 +3,7 @@
 Machinjiri is a PHP framework for building web applications, APIs, and internal tools. This guide is written as a first project tutorial: install Machinjiri, run an app, add a route, and render a page.
 
 ![Machinjiri PHP Framework](https://img.shields.io/badge/Machinjiri-PHP_Framework-6C2EB9?logo=php&logoColor=white)
-![Version 2.3.3](https://img.shields.io/badge/Version-2.3.3-2563EB)
+![Version 2.3.4](https://img.shields.io/badge/Version-2.3.4-2563EB)
 ![PHP ^8.4](https://img.shields.io/badge/PHP-%5E8.4-777BB4?logo=php&logoColor=white)
 ![Composer 2.0+](https://img.shields.io/badge/Composer-2.0%2B-885630?logo=composer&logoColor=white)
 ![Proprietary license](https://img.shields.io/badge/License-Proprietary-lightgrey)
@@ -194,50 +194,6 @@ composer test
 
 If you change a route or view and do not see the change in your browser, check that the development server is still running and reload the page. If a command is not recognized, run it from the application directory and confirm the project dependencies were installed.
 
-## Chat and social media transports
-
-The Chat manager supports WhatsApp Cloud API messages, Facebook Page feed posts, Instagram image/Reels publishing, and TikTok video publishing. Configure provider credentials in your application configuration and keep access tokens in environment variables:
-
-```php
-use Mlangeni\Machinjiri\Core\Transport\Chat\ChatManager;
-use Mlangeni\Machinjiri\Core\Transport\Chat\ChatMessage;
-
-$chat = ChatManager::fromConfig([
-    'default' => 'facebook',
-    'transports' => [
-        'facebook' => [
-            'driver' => 'facebook',
-            'page_id' => $_ENV['FACEBOOK_PAGE_ID'],
-            'access_token' => $_ENV['FACEBOOK_PAGE_ACCESS_TOKEN'],
-            'api_version' => 'v22.0',
-        ],
-        'whatsapp' => [
-            'driver' => 'whatsapp',
-            'phone_number_id' => $_ENV['WHATSAPP_PHONE_NUMBER_ID'],
-            'access_token' => $_ENV['WHATSAPP_ACCESS_TOKEN'],
-            'api_version' => 'v22.0',
-        ],
-        'instagram' => [
-            'driver' => 'instagram',
-            'account_id' => $_ENV['INSTAGRAM_ACCOUNT_ID'],
-            'access_token' => $_ENV['INSTAGRAM_ACCESS_TOKEN'],
-            'api_version' => 'v22.0',
-        ],
-        'tiktok' => [
-            'driver' => 'tiktok',
-            'access_token' => $_ENV['TIKTOK_ACCESS_TOKEN'],
-        ],
-    ],
-]);
-
-$result = $chat->send(
-    (new ChatMessage())->text('Hello from Machinjiri!'),
-    'facebook'
-);
-```
-
-WhatsApp messages need a recipient phone number; Instagram publishing needs a publicly reachable image or video URL, and TikTok publishing needs a publicly reachable video URL from an authorized domain. Instagram publication uses the provider's media-container workflow; TikTok's API starts a URL-pull publishing job. The manager returns a `ChatResponse`; provider API errors are returned as failed responses, while invalid local configuration or message input raises `ChatException`.
-
 ## Where to go next
 
 Machinjiri includes tools for building beyond this first page:
@@ -261,15 +217,17 @@ Explore the generated `app/`, `config/`, `database/`, `resources/`, and `routes/
 
 The database is only needed when your app uses database-backed features.
 
-## About Machinjiri 2.3.3
+## About Machinjiri 2.3.4
 
-Version 2.3.3 focuses on more reliable queue processing, stronger security APIs, and a leaner framework surface. This release also updates terminal tooling and aligns the documentation with features included in the package.
+Version 2.3.4 focuses on more reliable queue processing, stronger security APIs, and a leaner framework surface. This release also updates terminal tooling and aligns the documentation with features included in the package.
 
 - Refined queue job contracts, drivers, retries, and worker commands
 - Added configurable password policies and password hashing options
 - Added configurable encryption, including authenticated AES-GCM support
 - Strengthened CSRF token handling
 - Removed bundled Bootstrap UI components and framework-specific testing helpers; use the UI library and PHPUnit setup that fit your application
+- Add Chat Transport Feature
+- Move Routing Controllers and middleware to app/Http/
 
 ## Documentation
 
