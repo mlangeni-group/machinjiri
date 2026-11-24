@@ -115,6 +115,7 @@ class AppServiceProvider extends ServiceProvider
             if (is_dir($configDir)) {
                 $this->mergeConfigFrom($configDir . 'app.php', 'app');
                 $this->mergeConfigFrom($configDir . 'filesystem.php', 'filesystem');
+                $this->mergeConfigFrom($configDir . 'database_backup.php', 'database_backup');
                 $this->mergeConfigFrom($configDir . 'database.php', 'database');
                 $this->mergeConfigFrom($configDir . 'cache.php', 'cache');
                 $this->mergeConfigFrom($configDir . 'mail.php', 'mail');

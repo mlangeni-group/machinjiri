@@ -8,6 +8,7 @@ use Mlangeni\Machinjiri\Core\Exceptions\DatabaseException;
 use Mlangeni\Machinjiri\Core\Database\Grammars\{Grammar, MySqlGrammar, PostgresGrammar};
 use Mlangeni\Machinjiri\Core\Database\Config\DatabaseConfiguration;
 use Mlangeni\Machinjiri\Core\Database\Connection\{ State, Resolver, Pool as ConnectionPool, Factory, TransactionManager, PdoQueryRunner, MongoConnectionFactory, QueryClassifier };
+use Mlangeni\Machinjiri\Core\Database\Utility\DatabaseBackupManager;
 
 
 /**
@@ -240,6 +241,22 @@ class DatabaseConnection
     }
 
     /**
+     * Create a backup of the configured database.
+     */
+    public static function backup(?string $path = null, bool $overwrite = false): string
+    {
+        return self::backupManager($path)->backup($path, $overwrite);
+    }
+
+    /**
+     * Restore the configured database from a backup file.
+     */
+    public static function restore(string $path): void
+    {
+        self::backupManager($path)->restore($path);
+    }
+
+    /**
      * shutdown
      *
      * @return void
@@ -265,6 +282,22 @@ class DatabaseConnection
             throw DatabaseException::ConnectionError("DatabaseConnection has not been configured.");
         }
         return self::$instance;
+    }
+
+    private static function backupManager(?string $path = null): DatabaseBackupManager
+    {
+        $self = self::instance();
+        $configuration = $self->state->databaseCfg;
+        if ($configuration === null) {
+            throw DatabaseException::ConnectionError("Database configuration is not available.");
+        }
+
+        $directory = $path === null
+            ? rtrim(getcwd() ?: '.', DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'storage'
+                . DIRECTORY_SEPARATOR . 'database-backups'
+            : dirname($path);
+
+        return new DatabaseBackupManager($configuration, $directory);
     }
 
     /**
