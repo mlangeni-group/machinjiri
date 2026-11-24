@@ -443,6 +443,13 @@ class Router
             return;
         }
 
+        if ($result instanceof HttpResponse) {
+            if (!$result->isSent()) {
+                $result->send();
+            }
+            return;
+        }
+
         if ($this->httpRequest->isAjax() || $this->expectsJson()) {
             $this->httpResponse->setJsonBody(is_array($result) || is_object($result) ? $result : ['data' => $result]);
             $this->httpResponse->send();

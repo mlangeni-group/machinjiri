@@ -42,6 +42,17 @@ class FormValidator
 
   public function addRule(string $field, $rule, ...$params): self
   {
+    if (in_array($rule, ['in', 'notIn', 'mimes'], true)) {
+      $options = [];
+      foreach ($params as $param) {
+        if (is_array($param)) {
+          $options = array_merge($options, array_map('strval', $param));
+        } else {
+          $options = array_merge($options, array_map('trim', explode(',', (string) $param)));
+        }
+      }
+      $params = [$options];
+    }
     $this->rules[$field][] = [
       'rule' => $rule,
       'params' => $params

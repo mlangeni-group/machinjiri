@@ -7,7 +7,7 @@ class RoutingConfig
     public function __construct(
         public string $cacheFile = '',
         public string $errorsDir = '',
-        public string $controllersNamespace = 'Mlangeni\\Machinjiri\\App\\Controllers',
+        public string $controllersNamespace = 'Mlangeni\\Machinjiri\\App\\Http\\Controllers',
         public array $rateLimiters = [],
         public string $viewsBasePath = '',
         public string $viewsCachePath = '',

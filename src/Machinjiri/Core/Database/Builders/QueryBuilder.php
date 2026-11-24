@@ -252,7 +252,9 @@ class QueryBuilder {
     {
       
       $wrappedTable = $this->grammar->wrapTable($this->table);
-        $wrappedColumns = array_map([$this->grammar, 'wrapColumn'], $this->columns);
+        $wrappedColumns = $this->columns === ['*']
+            ? ['*']
+            : array_map([$this->grammar, 'wrapColumn'], $this->columns);
         
         $distinct = $this->distinct ? 'DISTINCT ' : '';
         $sql = "SELECT " . $distinct . implode(', ', $wrappedColumns) . " FROM {$wrappedTable}";

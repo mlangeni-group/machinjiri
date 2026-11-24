@@ -6,9 +6,12 @@ use Mlangeni\Machinjiri\Core\Exceptions\MachinjiriException;
 use Mlangeni\Machinjiri\Core\Http\HttpRequest;
 use Mlangeni\Machinjiri\Core\Http\HttpResponse;
 use Mlangeni\Machinjiri\Core\Routing\Contracts\HandlerResolverInterface;
+use ReflectionClass;
 
 class RouteHandlerResolver implements HandlerResolverInterface
 {
+    private const CONTROLLER_NAMESPACE = "App\\Http\\Controllers\\";
+
     public function execute(mixed $handler, array $params, HttpRequest $request, HttpResponse $response): mixed
     {
         if (is_callable($handler)) {
@@ -22,11 +25,11 @@ class RouteHandlerResolver implements HandlerResolverInterface
             $controller = ltrim($controller, '\\');
             $controllerClass = str_contains($controller, '\\')
                 ? $controller
-                : "App\\Controllers\\{$controller}";
+                : self::CONTROLLER_NAMESPACE . $controller;
 
             if (!class_exists($controllerClass)) {
                 // fallback to config namespace
-                $controllerClass = "App\\Controllers\\{$controller}";
+                $controllerClass = self::CONTROLLER_NAMESPACE . $controller;
             }
 
             if (!class_exists($controllerClass)) {
@@ -42,7 +45,14 @@ class RouteHandlerResolver implements HandlerResolverInterface
 
         if (is_array($handler) && count($handler) === 2) {
             [$controller, $method] = $handler;
-            if (is_string($controller) && class_exists($controller)) {
+            if (is_string($controller)) {
+                $rc = new ReflectionClass($controller);
+                $namespace = rtrim(self::CONTROLLER_NAMESPACE, '\\');
+
+                if ($rc->getNamespaceName() !== $namespace) {
+                    throw new MachinjiriException("Http Controllers must be in {$namespace} namespace");
+                }
+                
                 $instance = new $controller();
             } elseif (is_object($controller)) {
                 $instance = $controller;

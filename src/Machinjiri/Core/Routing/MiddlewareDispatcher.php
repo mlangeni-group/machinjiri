@@ -10,6 +10,8 @@ use Mlangeni\Machinjiri\Core\Routing\Contracts\MiddlewareDispatcherInterface;
 
 class MiddlewareDispatcher implements MiddlewareDispatcherInterface
 {
+    private const MIDDLEWARE_NAMESPACE = "App\\Http\\Middleware\\";
+
     public function __construct(
         protected HttpRequest $request,
         protected HttpResponse $response
@@ -34,7 +36,7 @@ class MiddlewareDispatcher implements MiddlewareDispatcherInterface
 
     protected function resolveMiddleware(string $name): callable
     {
-        $class = "App\\Middleware\\{$name}";
+        $class = self::MIDDLEWARE_NAMESPACE . $name;
         if (!class_exists($class)) {
             throw new MachinjiriException("Middleware class '{$class}' not found");
         }
