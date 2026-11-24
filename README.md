@@ -194,6 +194,50 @@ composer test
 
 If you change a route or view and do not see the change in your browser, check that the development server is still running and reload the page. If a command is not recognized, run it from the application directory and confirm the project dependencies were installed.
 
+## Chat and social media transports
+
+The Chat manager supports WhatsApp Cloud API messages, Facebook Page feed posts, Instagram image/Reels publishing, and TikTok video publishing. Configure provider credentials in your application configuration and keep access tokens in environment variables:
+
+```php
+use Mlangeni\Machinjiri\Core\Transport\Chat\ChatManager;
+use Mlangeni\Machinjiri\Core\Transport\Chat\ChatMessage;
+
+$chat = ChatManager::fromConfig([
+    'default' => 'facebook',
+    'transports' => [
+        'facebook' => [
+            'driver' => 'facebook',
+            'page_id' => $_ENV['FACEBOOK_PAGE_ID'],
+            'access_token' => $_ENV['FACEBOOK_PAGE_ACCESS_TOKEN'],
+            'api_version' => 'v22.0',
+        ],
+        'whatsapp' => [
+            'driver' => 'whatsapp',
+            'phone_number_id' => $_ENV['WHATSAPP_PHONE_NUMBER_ID'],
+            'access_token' => $_ENV['WHATSAPP_ACCESS_TOKEN'],
+            'api_version' => 'v22.0',
+        ],
+        'instagram' => [
+            'driver' => 'instagram',
+            'account_id' => $_ENV['INSTAGRAM_ACCOUNT_ID'],
+            'access_token' => $_ENV['INSTAGRAM_ACCESS_TOKEN'],
+            'api_version' => 'v22.0',
+        ],
+        'tiktok' => [
+            'driver' => 'tiktok',
+            'access_token' => $_ENV['TIKTOK_ACCESS_TOKEN'],
+        ],
+    ],
+]);
+
+$result = $chat->send(
+    (new ChatMessage())->text('Hello from Machinjiri!'),
+    'facebook'
+);
+```
+
+WhatsApp messages need a recipient phone number; Instagram publishing needs a publicly reachable image or video URL, and TikTok publishing needs a publicly reachable video URL from an authorized domain. Instagram publication uses the provider's media-container workflow; TikTok's API starts a URL-pull publishing job. The manager returns a `ChatResponse`; provider API errors are returned as failed responses, while invalid local configuration or message input raises `ChatException`.
+
 ## Where to go next
 
 Machinjiri includes tools for building beyond this first page:
