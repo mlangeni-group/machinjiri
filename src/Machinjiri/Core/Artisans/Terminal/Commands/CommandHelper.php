@@ -15,8 +15,6 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 
 trait CommandHelper
 {
-    /** @var TERMINAL_VERSION */
-    public const TERMINAL_VERSION = "2.0";
 
     /**
      * Execute a command with standardised setup and exception handling.
