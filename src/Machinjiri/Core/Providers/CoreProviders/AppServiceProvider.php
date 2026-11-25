@@ -199,7 +199,6 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(Logger::class, function ($app) {
             return new Logger(env('APP_NAME') ?? 'machinjiri', Logger::DEBUG, false, '', 'app');
         });
-    }
 
         $this->singleton('app.main.logger', function ($app) {
             return new Logger(env('APP_NAME') ?? 'machinjiri', Logger::DEBUG, true, '', 'app');
