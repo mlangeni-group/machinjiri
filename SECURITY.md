@@ -18,6 +18,8 @@ This framework is actively maintained and supported for the following versions:
 | 2.2.9   | :white_check_mark: |
 | 2.3.1   | :white_check_mark: |
 | 2.3.2   | :white_check_mark: |
+| 2.3.3   | :white_check_mark: |
+| Cinna   | :white_check_mark: |
 
 
 ## Reporting a Vulnerability
