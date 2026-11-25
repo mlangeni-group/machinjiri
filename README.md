@@ -1,9 +1,9 @@
-# Machinjiri PHP Framework
+# Machinjiri PHP Framework - Cinnamon
 
 Machinjiri is a PHP framework for building web applications, APIs, and internal tools. This guide is written as a first project tutorial: install Machinjiri, run an app, add a route, and render a page.
 
 ![Machinjiri PHP Framework](https://img.shields.io/badge/Machinjiri-PHP_Framework-6C2EB9?logo=php&logoColor=white)
-![Version 2.3.4](https://img.shields.io/badge/Version-2.3.4-2563EB)
+![Cinnamon](https://img.shields.io/badge/Cinnamon-2.3.5-2563EB)
 ![PHP ^8.4](https://img.shields.io/badge/PHP-%5E8.4-777BB4?logo=php&logoColor=white)
 ![Composer 2.0+](https://img.shields.io/badge/Composer-2.0%2B-885630?logo=composer&logoColor=white)
 ![Proprietary license](https://img.shields.io/badge/License-Proprietary-lightgrey)
